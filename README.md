@@ -4,7 +4,7 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/nelsonmarro/go_ec_sri_invoice_signer)](https://goreportcard.com/report/github.com/nelsonmarro/go_ec_sri_invoice_signer)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-A robust, pure Go implementation for signing electronic documents according to the **Ecuadorian SRI (Servicio de Rentas Internas)** standards. This library generates **XAdES-BES** signatures required for legally valid electronic invoicing in Ecuador.
+A robust, pure Go implementation for signing electronic documents according to the **Ecuadorian SRI (Servicio de Rentas Internas)** standards. This library is a Go port of the original Node.js implementation [ec-sri-invoice-signer](https://github.com/bryancalisto/ec-sri-invoice-signer) by Bryan Calisto.
 
 ---
 
@@ -118,6 +118,12 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 ## 📄 License
 
 Distributed under the MIT License. See `LICENSE` for more information.
+
+---
+
+## 🙌 Thanks
+
+Special thanks to [Bryan Calisto](https://github.com/bryancalisto) for the original TypeScript implementation which served as the foundation for this Go port.
 
 ---
 
