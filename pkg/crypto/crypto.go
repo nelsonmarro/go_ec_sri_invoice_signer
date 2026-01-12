@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"strings"
 
 	"software.sslmate.com/src/go-pkcs12"
 )
@@ -64,14 +65,10 @@ func GetPrivateKeyData(key *rsa.PrivateKey) (string, string) {
 	return modulus, exponent
 }
 
-// GetIssuerName returns the certificate issuer name as a string.
+// GetIssuerName returns the certificate issuer name as a string formatted for SRI.
 func GetIssuerName(cert *x509.Certificate) string {
-	// This is a simplification. For exact matching of Node's logic, we might need
-	// to inspect the RawSubject/RawIssuer and parse ASN.1 or use String() and adjust.
-	// Node: reverse order of attributes.
-	// Go's String() usually gives "CN=...,OU=..."
-	// Let's assume standard behavior first.
-	return cert.Issuer.String()
+	// SRI expects no spaces after commas. Go's String() adds them.
+	return strings.ReplaceAll(cert.Issuer.String(), ", ", ",")
 }
 
 // GetCertHash returns the base64 encoded SHA1 hash of the raw certificate.

@@ -105,7 +105,7 @@ func signDocument(docXML string, p12Data []byte, rootTagName string, options *Si
 	keyInfoHash := crypto.SHA1(keyInfoCanonical)
 
 	// 3. Build SignedProperties
-	signingTime := time.Now().Format("2006-01-02T15:04:05") // ISO8601 simple
+	signingTime := time.Now().Format("2006-01-02T15:04:05-07:00") // ISO8601 with offset
 	signedProperties := types.SignedProperties{
 		ID: signedPropertiesTagId,
 		SignedSignatureProperties: types.SignedSignatureProperties{
@@ -213,6 +213,20 @@ func signDocument(docXML string, p12Data []byte, rootTagName string, options *Si
 		return "", fmt.Errorf("failed to marshal signature: %w", err)
 	}
 
+	// Optimization: Since SRI's Reference doesn't have C14N transform,
+	// we must ensure the XML we send is IDENTICAL to what we hashed.
+	// We replace the marshaled fragments with their canonicalized versions.
+	finalSignatureStr := string(signatureBytes)
+	
+	// Replace KeyInfo with canonicalized version
+	// Note: keyInfoCanonical already has xmlns:ds injected
+	oldKeyInfo, _ := xml.Marshal(keyInfo)
+	finalSignatureStr = strings.Replace(finalSignatureStr, string(oldKeyInfo), string(keyInfoCanonical), 1)
+
+	// Replace SignedProperties with canonicalized version
+	oldSignedProps, _ := xml.Marshal(signedProperties)
+	finalSignatureStr = strings.Replace(finalSignatureStr, string(oldSignedProps), string(signedPropsCanonical), 1)
+
 	// 6. Insert into Document
 	// Find </rootTagName> and insert before it
 	closingTag := fmt.Sprintf("</%s>", rootTagName)
@@ -220,7 +234,7 @@ func signDocument(docXML string, p12Data []byte, rootTagName string, options *Si
 		return "", fmt.Errorf("%w: %s", ErrMissingClosingTag, closingTag)
 	}
 
-	finalXml := strings.Replace(docXML, closingTag, string(signatureBytes)+closingTag, 1)
+	finalXml := strings.Replace(docXML, closingTag, finalSignatureStr+closingTag, 1)
 
 	return finalXml, nil
 }
