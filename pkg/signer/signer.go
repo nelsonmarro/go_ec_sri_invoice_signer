@@ -234,7 +234,20 @@ func signDocument(docXML string, p12Data []byte, rootTagName string, options *Si
 		return "", fmt.Errorf("%w: %s", ErrMissingClosingTag, closingTag)
 	}
 
-	finalXml := strings.Replace(docXML, closingTag, finalSignatureStr+closingTag, 1)
+	// IMPORTANT: We must use the canonicalized document body to ensure the hash matches
+	// But we should keep the XML declaration if it was there.
+	header := ""
+	if strings.HasPrefix(strings.TrimSpace(docXML), "<?xml") {
+		endDecl := strings.Index(docXML, "?>")
+		if endDecl != -1 {
+			header = docXML[:endDecl+2] + "\n"
+		}
+	}
+
+	finalXml := header + strings.Replace(string(docCanonical), closingTag, finalSignatureStr+closingTag, 1)
+
+	// User requested debug log
+	fmt.Printf("--- SIGNED XML START ---\n%s\n--- SIGNED XML END ---\n", finalXml)
 
 	return finalXml, nil
 }
