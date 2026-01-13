@@ -154,7 +154,10 @@ func signDocument(docXML string, p12Data []byte, rootTagName string, options *Si
 				ID:  docTagRefId,
 				URI: "#" + docTagId,
 				Transforms: &types.Transforms{
-					Transform: []types.AlgorithmMethod{{Algorithm: types.AlgorithmTransform}},
+					Transform: []types.AlgorithmMethod{
+						{Algorithm: types.AlgorithmTransform},
+						{Algorithm: types.AlgorithmC14N},
+					},
 				},
 				DigestMethod: types.AlgorithmMethod{Algorithm: types.AlgorithmDigest},
 				DigestValue:  docHash,
