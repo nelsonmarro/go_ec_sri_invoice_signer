@@ -253,6 +253,9 @@ func signDocument(docXML string, p12Data []byte, rootTagName string, options *Si
 
 	finalXml := header + strings.Replace(string(docCanonical), closingTag, finalSignatureStr+closingTag, 1)
 
+	// User requested debug log
+	fmt.Printf("--- SIGNED XML START ---\n%s\n--- SIGNED XML END ---\n", finalXml)
+
 	return finalXml, nil
 }
 
