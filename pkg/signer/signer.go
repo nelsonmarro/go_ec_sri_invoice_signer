@@ -198,59 +198,60 @@ func signDocument(docXML string, p12Data []byte, rootTagName string, options *Si
 		return "", fmt.Errorf("%w: %v", ErrSigning, err)
 	}
 
-		// 5. Build Signature
-		signature := types.Signature{
-			XmlnsDs:    types.DsNamespace,
-			XmlnsXades: types.XadesNamespace,
-			ID:         signatureTagId,
-			SignedInfo: signedInfo,
-			SignatureValue: types.SignatureValue{
-				ID:    signatureValueTagId,
-				Value: signatureValue,
+	// 5. Build Signature
+	signature := types.Signature{
+		XmlnsDs:    types.DsNamespace,
+		XmlnsXades: types.XadesNamespace,
+		ID:         signatureTagId,
+		SignedInfo: signedInfo,
+		SignatureValue: types.SignatureValue{
+			ID:    signatureValueTagId,
+			Value: signatureValue,
+		},
+		KeyInfo: keyInfo,
+		Object: types.Object{
+			ID: signatureObjectTagId,
+			QualifyingProperties: types.QualifyingProperties{
+				XmlnsXades:       types.XadesNamespace,
+				Target:           "#" + signatureTagId,
+				SignedProperties: signedProperties,
 			},
-			KeyInfo: keyInfo,
-			Object: types.Object{
-				ID: signatureObjectTagId,
-				QualifyingProperties: types.QualifyingProperties{
-					XmlnsXades:       types.XadesNamespace,
-					Target:           "#" + signatureTagId,
-					SignedProperties: signedProperties,
-				},
-			},
-		}
-	
-		// Marshal final signature
-		signatureBytes, err := xml.Marshal(signature)
-		if err != nil {
-			return "", fmt.Errorf("failed to marshal signature: %w", err)
-		}
-	
-		// Optimization: Since SRI's Reference doesn't have C14N transform,
-		// we must ensure the XML we send is IDENTICAL to what we hashed.
-		// We replace the marshaled fragments with their canonicalized versions.
-		finalSignatureStr := string(signatureBytes)
-	
-		// Replace SignedInfo with canonicalized version
-		oldSignedInfo, _ := xml.Marshal(signedInfo)
-		finalSignatureStr = strings.Replace(finalSignatureStr, string(oldSignedInfo), string(signedInfoCanonical), 1)
-	
-		// Replace KeyInfo with canonicalized version
-		// Note: keyInfoCanonical already has xmlns:ds injected
-		oldKeyInfo, _ := xml.Marshal(keyInfo)
-		finalSignatureStr = strings.Replace(finalSignatureStr, string(oldKeyInfo), string(keyInfoCanonical), 1)
-	
-		// Replace SignedProperties with canonicalized version
-		oldSignedProps, _ := xml.Marshal(signedProperties)
-		finalSignatureStr = strings.Replace(finalSignatureStr, string(oldSignedProps), string(signedPropsCanonical), 1)
-		// 6. Insert into Document
-	// Find </rootTagName> and insert before it
+		},
+	}
+
+	// Marshal final signature (no indentation/newlines)
+	signatureBytes, err := xml.Marshal(signature)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal signature: %w", err)
+	}
+
+	// Optimization: Since SRI's Reference doesn't have C14N transform,
+	// we must ensure the XML we send is IDENTICAL to what we hashed.
+	// We replace the marshaled fragments with their canonicalized versions.
+	finalSignatureStr := string(signatureBytes)
+
+	// Replace SignedInfo with canonicalized version
+	oldSignedInfo, _ := xml.Marshal(signedInfo)
+	finalSignatureStr = strings.Replace(finalSignatureStr, string(oldSignedInfo), string(signedInfoCanonical), 1)
+
+	// Replace KeyInfo with canonicalized version
+	oldKeyInfo, _ := xml.Marshal(keyInfo)
+	finalSignatureStr = strings.Replace(finalSignatureStr, string(oldKeyInfo), string(keyInfoCanonical), 1)
+
+	// Replace SignedProperties with canonicalized version
+	oldSignedProps, _ := xml.Marshal(signedProperties)
+	finalSignatureStr = strings.Replace(finalSignatureStr, string(oldSignedProps), string(signedPropsCanonical), 1)
+
+	// 6. Insert into Document
+	// Find the LAST </rootTagName> and insert before it
 	closingTag := fmt.Sprintf("</%s>", rootTagName)
-	if !strings.Contains(docXML, closingTag) {
+	body := string(docCanonical)
+	idx := strings.LastIndex(body, closingTag)
+	if idx == -1 {
 		return "", fmt.Errorf("%w: %s", ErrMissingClosingTag, closingTag)
 	}
 
-	// IMPORTANT: We must use the canonicalized document body to ensure the hash matches
-	// But we should keep the XML declaration if it was there.
+	// Reconstruct final XML
 	header := ""
 	if strings.HasPrefix(strings.TrimSpace(docXML), "<?xml") {
 		endDecl := strings.Index(docXML, "?>")
@@ -259,10 +260,7 @@ func signDocument(docXML string, p12Data []byte, rootTagName string, options *Si
 		}
 	}
 
-	finalXml := header + strings.Replace(string(docCanonical), closingTag, finalSignatureStr+closingTag, 1)
-
-	// User requested debug log
-	fmt.Printf("--- SIGNED XML START ---\n%s\n--- SIGNED XML END ---\n", finalXml)
+	finalXml := header + body[:idx] + finalSignatureStr + body[idx:]
 
 	return finalXml, nil
 }
