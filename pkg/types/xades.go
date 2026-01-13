@@ -7,8 +7,8 @@ const (
 	DsNamespace          = "http://www.w3.org/2000/09/xmldsig#"
 	XadesNamespace       = "http://uri.etsi.org/01903/v1.3.2#"
 	AlgorithmC14N        = "http://www.w3.org/TR/2001/REC-xml-c14n-20010315"
-	AlgorithmDigest      = "http://www.w3.org/2000/09/xmldsig#sha1"
-	AlgorithmSignature   = "http://www.w3.org/2000/09/xmldsig#rsa-sha1"
+	AlgorithmDigest      = "http://www.w3.org/2001/04/xmlenc#sha256"
+	AlgorithmSignature   = "http://www.w3.org/2001/04/xmldsig-more#rsa-sha256"
 	AlgorithmTransform   = "http://www.w3.org/2000/09/xmldsig#enveloped-signature"
 	TypeSignedProperties = "http://uri.etsi.org/01903#SignedProperties"
 )

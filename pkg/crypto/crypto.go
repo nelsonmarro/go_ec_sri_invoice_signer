@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha1"
+	"crypto/sha256"
 	"crypto/x509"
 	"encoding/base64"
 	"errors"
@@ -42,13 +43,21 @@ func SHA1(data []byte) string {
 	return base64.StdEncoding.EncodeToString(sum)
 }
 
-// Sign signs the data using RSA-SHA1 and returns the base64 encoded signature.
+// SHA256 returns the base64 encoded SHA256 hash of the data.
+func SHA256(data []byte) string {
+	h := sha256.New()
+	h.Write(data)
+	sum := h.Sum(nil)
+	return base64.StdEncoding.EncodeToString(sum)
+}
+
+// Sign signs the data using RSA-SHA256 and returns the base64 encoded signature.
 func Sign(data []byte, key *rsa.PrivateKey) (string, error) {
-	h := sha1.New()
+	h := sha256.New()
 	h.Write(data)
 	digest := h.Sum(nil)
 
-	signature, err := rsa.SignPKCS1v15(rand.Reader, key, crypto.SHA1, digest)
+	signature, err := rsa.SignPKCS1v15(rand.Reader, key, crypto.SHA256, digest)
 	if err != nil {
 		return "", err
 	}
@@ -71,9 +80,9 @@ func GetIssuerName(cert *x509.Certificate) string {
 	return strings.ReplaceAll(cert.Issuer.String(), ", ", ",")
 }
 
-// GetCertHash returns the base64 encoded SHA1 hash of the raw certificate.
+// GetCertHash returns the base64 encoded SHA256 hash of the raw certificate.
 func GetCertHash(cert *x509.Certificate) string {
-	h := sha1.New()
+	h := sha256.New()
 	h.Write(cert.Raw)
 	return base64.StdEncoding.EncodeToString(h.Sum(nil))
 }
