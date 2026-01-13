@@ -228,19 +228,17 @@ func signDocument(docXML string, p12Data []byte, rootTagName string, options *Si
 	// Optimization: Since SRI's Reference doesn't have C14N transform,
 	// we must ensure the XML we send is IDENTICAL to what we hashed.
 	// We replace the marshaled fragments with their canonicalized versions.
+	// To ensure the replacement works even if namespaces vary, we find the tags.
 	finalSignatureStr := string(signatureBytes)
 
 	// Replace SignedInfo with canonicalized version
-	oldSignedInfo, _ := xml.Marshal(signedInfo)
-	finalSignatureStr = strings.Replace(finalSignatureStr, string(oldSignedInfo), string(signedInfoCanonical), 1)
+	finalSignatureStr = replaceTag(finalSignatureStr, "ds:SignedInfo", string(signedInfoCanonical))
 
 	// Replace KeyInfo with canonicalized version
-	oldKeyInfo, _ := xml.Marshal(keyInfo)
-	finalSignatureStr = strings.Replace(finalSignatureStr, string(oldKeyInfo), string(keyInfoCanonical), 1)
+	finalSignatureStr = replaceTag(finalSignatureStr, "ds:KeyInfo", string(keyInfoCanonical))
 
 	// Replace SignedProperties with canonicalized version
-	oldSignedProps, _ := xml.Marshal(signedProperties)
-	finalSignatureStr = strings.Replace(finalSignatureStr, string(oldSignedProps), string(signedPropsCanonical), 1)
+	finalSignatureStr = replaceTag(finalSignatureStr, "xades:SignedProperties", string(signedPropsCanonical))
 
 	// 6. Insert into Document
 	// Find the LAST </rootTagName> and insert before it
@@ -263,6 +261,20 @@ func signDocument(docXML string, p12Data []byte, rootTagName string, options *Si
 	finalXml := header + body[:idx] + finalSignatureStr + body[idx:]
 
 	return finalXml, nil
+}
+
+func replaceTag(xmlStr, tagName, canonicalPart string) string {
+	startTag := "<" + tagName
+	endTag := "</" + tagName + ">"
+
+	startIdx := strings.Index(xmlStr, startTag)
+	endIdx := strings.Index(xmlStr, endTag)
+
+	if startIdx == -1 || endIdx == -1 {
+		return xmlStr
+	}
+
+	return xmlStr[:startIdx] + canonicalPart + xmlStr[endIdx+len(endTag):]
 }
 
 func randomID() string {
