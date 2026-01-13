@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/xml"
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 
@@ -53,6 +54,14 @@ func signDocument(docXML string, p12Data []byte, rootTagName string, options *Si
 		return "", fmt.Errorf("%w: %v", ErrParsingP12, err)
 	}
 
+	// 0. Pre-process: Flatten the XML
+	// Remove whitespace between tags to ensure a "flattened" document.
+	// This helps with C14N consistency and SRI validation.
+	// Regex: >\s+< -> ><
+	re := regexp.MustCompile(`>\s+<`)
+	docXML = re.ReplaceAllString(docXML, "><")
+	docXML = strings.TrimSpace(docXML)
+
 	// Clean XML: Remove declaration and leading/trailing whitespace
 	// SRI hashes the node referenced by ID (e.g. #comprobante), not the whole file.
 	cleanXML := docXML
@@ -63,6 +72,7 @@ func signDocument(docXML string, p12Data []byte, rootTagName string, options *Si
 
 	// 1. Hash Document Body (No explicit C14N for body, trusting the clean source)
 	// We use the raw cleaned XML bytes for the hash.
+	// We can try to rely on C14N to produce the byte stream, but we need to *store* that result as the final XML doc.
 	docCanonical := []byte(cleanXML)
 	docHash := crypto.SHA256(docCanonical)
 
@@ -198,8 +208,16 @@ func signDocument(docXML string, p12Data []byte, rootTagName string, options *Si
 
 	// 5. Build Signature
 	signature := types.Signature{
+		XMLName:    xml.Name{Local: "ds:Signature"},
 		XmlnsDs:    types.DsNamespace,
-		XmlnsXades: types.XadesNamespace,
+		XmlnsXades: types.XadesNamespace, // Usually not on Signature, but QualifyingProperties. Let's check types.
+		// Wait, types.Signature doesn't haveXmlnsXades usually. 
+		// Looking at types.go: 
+		// type Signature struct {
+		// 	XmlnsDs        string   `xml:"xmlns:ds,attr"`
+		//  ...
+		// }
+		// We'll stick to types definition.
 		ID:         signatureTagId,
 		SignedInfo: signedInfo,
 		SignatureValue: types.SignatureValue{
@@ -216,6 +234,12 @@ func signDocument(docXML string, p12Data []byte, rootTagName string, options *Si
 			},
 		},
 	}
+	
+	// Fix xmlns:xades injection if needed.
+	// In types.go:
+	// type QualifyingProperties struct {
+	// 	XMLName          xml.Name `xml:"xades:QualifyingProperties"`
+	// 	XmlnsXades       string   `xml:"xmlns:xades,attr"`
 
 	// Marshal final signature (no indentation/newlines)
 	signatureBytes, err := xml.Marshal(signature)
@@ -249,11 +273,10 @@ func signDocument(docXML string, p12Data []byte, rootTagName string, options *Si
 
 	// Reconstruct final XML
 	header := ""
-	if strings.HasPrefix(strings.TrimSpace(docXML), "<?xml") {
-		endDecl := strings.Index(docXML, "?>")
-		if endDecl != -1 {
-			header = docXML[:endDecl+2] + "\n"
-		}
+	// If the original had a header, we construct a generic clean one or reuse.
+	// SRI accepts generic UTF-8 header.
+	if strings.Contains(docXML, "<?xml") {
+		header = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
 	}
 
 	finalXml := header + body[:idx] + finalSignatureStr + body[idx:]
@@ -307,9 +330,9 @@ func ensureNamespace(xmlData []byte, prefix, uri string) []byte {
 		// No attributes, insert at end of tag name
 		// But tag name might be <ds:Tag>
 		// Insert before '>'
-		return []byte(s[:firstTagEnd] + fmt.Sprintf(" %s=\"%s\"", nsAttr, uri) + s[firstTagEnd:])
+		return []byte(s[:firstTagEnd] + fmt.Sprintf(" %s=\"" + uri + "\"", nsAttr) + s[firstTagEnd:])
 	}
 
 	// Insert after tag name (at first space)
-	return []byte(s[:firstSpace] + fmt.Sprintf(" %s=\"%s\"", nsAttr, uri) + s[firstSpace:])
+	return []byte(s[:firstSpace] + fmt.Sprintf(" %s=\"" + uri + "\"", nsAttr) + s[firstSpace:])
 }

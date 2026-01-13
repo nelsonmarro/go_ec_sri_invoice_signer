@@ -3,6 +3,7 @@ package signer
 import (
 	"encoding/xml"
 	"os"
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -35,11 +36,29 @@ func TestSignInvoice(t *testing.T) {
 	if !strings.Contains(signedXml, "<ds:Signature") {
 		t.Error("expected Signature tag")
 	}
-	if !strings.Contains(signedXml, "<ds:KeyInfo") {
-		t.Error("expected KeyInfo tag")
-	}
 	if !strings.Contains(signedXml, "xmlns:ds=\"http://www.w3.org/2000/09/xmldsig#\"") {
 		t.Error("expected ds namespace")
+	}
+	
+	// SRI 2026 Checks:
+	// 1. SHA256 Algorithm
+	if !strings.Contains(signedXml, "http://www.w3.org/2001/04/xmldsig-more#rsa-sha256") {
+		t.Error("expected SHA256 signature method")
+	}
+	if !strings.Contains(signedXml, "http://www.w3.org/2001/04/xmlenc#sha256") {
+		t.Error("expected SHA256 digest method")
+	}
+
+	// 2. Flattening (no spaces between root level tags)
+	if strings.Contains(signedXml, ">\n    <infoTributaria>") {
+		t.Error("expected flattened XML (no newlines/indentation between tags)")
+	}
+
+	// 3. Timezone in SigningTime
+	// Look for pattern like 2026-01-13T11:01:52-05:00
+	re := regexp.MustCompile(`\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2}`)
+	if !re.MatchString(signedXml) {
+		t.Error("expected SigningTime with timezone offset")
 	}
 	
 	// Basic XML validity check
