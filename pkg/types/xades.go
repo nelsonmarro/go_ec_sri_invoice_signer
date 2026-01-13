@@ -66,6 +66,7 @@ type Transforms struct {
 type Signature struct {
 	XMLName        xml.Name `xml:"ds:Signature"`
 	XmlnsDs        string   `xml:"xmlns:ds,attr"`
+	XmlnsXades     string   `xml:"xmlns:xades,attr,omitempty"`
 	ID             string   `xml:"Id,attr"`
 	SignedInfo     SignedInfo
 	SignatureValue SignatureValue

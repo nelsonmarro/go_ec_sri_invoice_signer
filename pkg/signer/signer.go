@@ -190,47 +190,51 @@ func signDocument(docXML string, p12Data []byte, rootTagName string, options *Si
 		return "", fmt.Errorf("%w: %v", ErrSigning, err)
 	}
 
-	// 5. Build Signature
-	signature := types.Signature{
-		XmlnsDs:    types.DsNamespace,
-		ID:         signatureTagId,
-		SignedInfo: signedInfo,
-		SignatureValue: types.SignatureValue{
-			ID:    signatureValueTagId,
-			Value: signatureValue,
-		},
-		KeyInfo: keyInfo,
-		Object: types.Object{
-			ID: signatureObjectTagId,
-			QualifyingProperties: types.QualifyingProperties{
-				XmlnsXades:       types.XadesNamespace,
-				Target:           "#" + signatureTagId,
-				SignedProperties: signedProperties,
+		// 5. Build Signature
+		signature := types.Signature{
+			XmlnsDs:    types.DsNamespace,
+			XmlnsXades: types.XadesNamespace,
+			ID:         signatureTagId,
+			SignedInfo: signedInfo,
+			SignatureValue: types.SignatureValue{
+				ID:    signatureValueTagId,
+				Value: signatureValue,
 			},
-		},
-	}
-
-	// Marshal final signature
-	signatureBytes, err := xml.Marshal(signature)
-	if err != nil {
-		return "", fmt.Errorf("failed to marshal signature: %w", err)
-	}
-
-	// Optimization: Since SRI's Reference doesn't have C14N transform,
-	// we must ensure the XML we send is IDENTICAL to what we hashed.
-	// We replace the marshaled fragments with their canonicalized versions.
-	finalSignatureStr := string(signatureBytes)
+			KeyInfo: keyInfo,
+			Object: types.Object{
+				ID: signatureObjectTagId,
+				QualifyingProperties: types.QualifyingProperties{
+					XmlnsXades:       types.XadesNamespace,
+					Target:           "#" + signatureTagId,
+					SignedProperties: signedProperties,
+				},
+			},
+		}
 	
-	// Replace KeyInfo with canonicalized version
-	// Note: keyInfoCanonical already has xmlns:ds injected
-	oldKeyInfo, _ := xml.Marshal(keyInfo)
-	finalSignatureStr = strings.Replace(finalSignatureStr, string(oldKeyInfo), string(keyInfoCanonical), 1)
-
-	// Replace SignedProperties with canonicalized version
-	oldSignedProps, _ := xml.Marshal(signedProperties)
-	finalSignatureStr = strings.Replace(finalSignatureStr, string(oldSignedProps), string(signedPropsCanonical), 1)
-
-	// 6. Insert into Document
+		// Marshal final signature
+		signatureBytes, err := xml.Marshal(signature)
+		if err != nil {
+			return "", fmt.Errorf("failed to marshal signature: %w", err)
+		}
+	
+		// Optimization: Since SRI's Reference doesn't have C14N transform,
+		// we must ensure the XML we send is IDENTICAL to what we hashed.
+		// We replace the marshaled fragments with their canonicalized versions.
+		finalSignatureStr := string(signatureBytes)
+	
+		// Replace SignedInfo with canonicalized version
+		oldSignedInfo, _ := xml.Marshal(signedInfo)
+		finalSignatureStr = strings.Replace(finalSignatureStr, string(oldSignedInfo), string(signedInfoCanonical), 1)
+	
+		// Replace KeyInfo with canonicalized version
+		// Note: keyInfoCanonical already has xmlns:ds injected
+		oldKeyInfo, _ := xml.Marshal(keyInfo)
+		finalSignatureStr = strings.Replace(finalSignatureStr, string(oldKeyInfo), string(keyInfoCanonical), 1)
+	
+		// Replace SignedProperties with canonicalized version
+		oldSignedProps, _ := xml.Marshal(signedProperties)
+		finalSignatureStr = strings.Replace(finalSignatureStr, string(oldSignedProps), string(signedPropsCanonical), 1)
+		// 6. Insert into Document
 	// Find </rootTagName> and insert before it
 	closingTag := fmt.Sprintf("</%s>", rootTagName)
 	if !strings.Contains(docXML, closingTag) {
