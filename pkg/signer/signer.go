@@ -53,8 +53,16 @@ func signDocument(docXML string, p12Data []byte, rootTagName string, options *Si
 		return "", fmt.Errorf("%w: %v", ErrParsingP12, err)
 	}
 
-	// 1. Canonicalize Document
-	docCanonical, err := c14n.Canonicalize([]byte(docXML))
+	// Clean XML: Remove declaration and leading/trailing whitespace
+	// SRI hashes the node referenced by ID (e.g. #comprobante), not the whole file.
+	cleanXML := docXML
+	if idx := strings.Index(cleanXML, "?>"); idx != -1 {
+		cleanXML = cleanXML[idx+2:]
+	}
+	cleanXML = strings.TrimSpace(cleanXML)
+
+	// 1. Canonicalize Document Body
+	docCanonical, err := c14n.Canonicalize([]byte(cleanXML))
 	if err != nil {
 		return "", fmt.Errorf("%w: %v", ErrCanonicalization, err)
 	}
