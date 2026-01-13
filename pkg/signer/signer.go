@@ -61,11 +61,9 @@ func signDocument(docXML string, p12Data []byte, rootTagName string, options *Si
 	}
 	cleanXML = strings.TrimSpace(cleanXML)
 
-	// 1. Canonicalize Document Body
-	docCanonical, err := c14n.Canonicalize([]byte(cleanXML))
-	if err != nil {
-		return "", fmt.Errorf("%w: %v", ErrCanonicalization, err)
-	}
+	// 1. Hash Document Body (No explicit C14N for body, trusting the clean source)
+	// We use the raw cleaned XML bytes for the hash.
+	docCanonical := []byte(cleanXML)
 	docHash := crypto.SHA256(docCanonical)
 
 	// IDs
@@ -164,7 +162,7 @@ func signDocument(docXML string, p12Data []byte, rootTagName string, options *Si
 				Transforms: &types.Transforms{
 					Transform: []types.AlgorithmMethod{
 						{Algorithm: types.AlgorithmTransform},
-						{Algorithm: types.AlgorithmC14N},
+						// Removed C14N transform for document body
 					},
 				},
 				DigestMethod: types.AlgorithmMethod{Algorithm: types.AlgorithmDigest},
