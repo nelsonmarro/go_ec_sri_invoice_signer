@@ -18,8 +18,8 @@ const (
 type KeyInfo struct {
 	XMLName  xml.Name `xml:"ds:KeyInfo"`
 	ID       string   `xml:"Id,attr"`
-	X509Data X509Data
-	KeyValue KeyValue
+	X509Data X509Data `xml:"ds:X509Data"`
+	KeyValue KeyValue `xml:"ds:KeyValue"`
 }
 
 type X509Data struct {
@@ -28,8 +28,8 @@ type X509Data struct {
 }
 
 type KeyValue struct {
-	XMLName     xml.Name `xml:"ds:KeyValue"`
-	RSAKeyValue RSAKeyValue
+	XMLName     xml.Name    `xml:"ds:KeyValue"`
+	RSAKeyValue RSAKeyValue `xml:"ds:RSAKeyValue"`
 }
 
 type RSAKeyValue struct {
@@ -64,14 +64,14 @@ type Transforms struct {
 }
 
 type Signature struct {
-	XMLName        xml.Name `xml:"ds:Signature"`
-	XmlnsDs        string   `xml:"xmlns:ds,attr"`
-	XmlnsXades     string   `xml:"xmlns:xades,attr,omitempty"`
-	ID             string   `xml:"Id,attr"`
-	SignedInfo     SignedInfo
-	SignatureValue SignatureValue
-	KeyInfo        KeyInfo
-	Object         Object
+	XMLName        xml.Name       `xml:"ds:Signature"`
+	XmlnsDs        string         `xml:"xmlns:ds,attr"`
+	XmlnsXades     string         `xml:"xmlns:xades,attr,omitempty"`
+	ID             string         `xml:"Id,attr"`
+	SignedInfo     SignedInfo     `xml:"ds:SignedInfo"`
+	SignatureValue SignatureValue `xml:"ds:SignatureValue"`
+	KeyInfo        KeyInfo        `xml:"ds:KeyInfo"`
+	Object         Object         `xml:"ds:Object"`
 }
 
 type SignatureValue struct {
@@ -81,42 +81,42 @@ type SignatureValue struct {
 }
 
 type Object struct {
-	XMLName              xml.Name `xml:"ds:Object"`
-	ID                   string   `xml:"Id,attr"`
-	QualifyingProperties QualifyingProperties
+	XMLName              xml.Name             `xml:"ds:Object"`
+	ID                   string               `xml:"Id,attr"`
+	QualifyingProperties QualifyingProperties `xml:"xades:QualifyingProperties"`
 }
 
 // XAdES Types
 
 type QualifyingProperties struct {
-	XMLName          xml.Name `xml:"xades:QualifyingProperties"`
-	XmlnsXades       string   `xml:"xmlns:xades,attr"`
-	Target           string   `xml:"Target,attr"`
-	SignedProperties SignedProperties
+	XMLName          xml.Name         `xml:"xades:QualifyingProperties"`
+	XmlnsXades       string           `xml:"xmlns:xades,attr"`
+	Target           string           `xml:"Target,attr"`
+	SignedProperties SignedProperties `xml:"xades:SignedProperties"`
 }
 
 type SignedProperties struct {
-	XMLName                    xml.Name `xml:"xades:SignedProperties"`
-	ID                         string   `xml:"Id,attr"`
-	SignedSignatureProperties  SignedSignatureProperties
-	SignedDataObjectProperties SignedDataObjectProperties
+	XMLName                    xml.Name                   `xml:"xades:SignedProperties"`
+	ID                         string                     `xml:"Id,attr"`
+	SignedSignatureProperties  SignedSignatureProperties  `xml:"xades:SignedSignatureProperties"`
+	SignedDataObjectProperties SignedDataObjectProperties `xml:"xades:SignedDataObjectProperties"`
 }
 
 type SignedSignatureProperties struct {
-	XMLName            xml.Name `xml:"xades:SignedSignatureProperties"`
-	SigningTime        string   `xml:"xades:SigningTime"`
-	SigningCertificate SigningCertificate
+	XMLName            xml.Name           `xml:"xades:SignedSignatureProperties"`
+	SigningTime        string             `xml:"xades:SigningTime"`
+	SigningCertificate SigningCertificate `xml:"xades:SigningCertificate"`
 }
 
 type SigningCertificate struct {
 	XMLName xml.Name `xml:"xades:SigningCertificate"`
-	Cert    Cert
+	Cert    Cert     `xml:"xades:Cert"`
 }
 
 type Cert struct {
-	XMLName      xml.Name `xml:"xades:Cert"`
-	CertDigest   CertDigest
-	IssuerSerial IssuerSerial
+	XMLName      xml.Name     `xml:"xades:Cert"`
+	CertDigest   CertDigest   `xml:"xades:CertDigest"`
+	IssuerSerial IssuerSerial `xml:"xades:IssuerSerial"`
 }
 
 type CertDigest struct {
@@ -132,8 +132,8 @@ type IssuerSerial struct {
 }
 
 type SignedDataObjectProperties struct {
-	XMLName          xml.Name `xml:"xades:SignedDataObjectProperties"`
-	DataObjectFormat DataObjectFormat
+	XMLName          xml.Name         `xml:"xades:SignedDataObjectProperties"`
+	DataObjectFormat DataObjectFormat `xml:"xades:DataObjectFormat"`
 }
 
 type DataObjectFormat struct {
