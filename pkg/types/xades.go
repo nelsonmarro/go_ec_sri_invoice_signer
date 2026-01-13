@@ -5,9 +5,9 @@ import "encoding/xml"
 
 const (
 	DsNamespace          = "http://www.w3.org/2000/09/xmldsig#"
-	XadesNamespace       = "http://uri.etsi.org/01903/v1.3.2#"
+	EtsiNamespace        = "http://uri.etsi.org/01903/v1.3.2#"
 	AlgorithmC14N        = "http://www.w3.org/TR/2001/REC-xml-c14n-20010315"
-	AlgorithmDigest      = "http://www.w3.org/2001/04/xmlenc#sha256"
+	AlgorithmDigest      = "http://www.w3.org/2000/09/xmldsig#sha1"
 	AlgorithmSignature   = "http://www.w3.org/2000/09/xmldsig#rsa-sha1"
 	AlgorithmTransform   = "http://www.w3.org/2000/09/xmldsig#enveloped-signature"
 	TypeSignedProperties = "http://uri.etsi.org/01903#SignedProperties"
@@ -18,8 +18,8 @@ const (
 type KeyInfo struct {
 	XMLName  xml.Name `xml:"ds:KeyInfo"`
 	ID       string   `xml:"Id,attr"`
-	X509Data X509Data `xml:"ds:X509Data"`
-	KeyValue KeyValue `xml:"ds:KeyValue"`
+	X509Data X509Data
+	KeyValue KeyValue
 }
 
 type X509Data struct {
@@ -28,8 +28,8 @@ type X509Data struct {
 }
 
 type KeyValue struct {
-	XMLName     xml.Name    `xml:"ds:KeyValue"`
-	RSAKeyValue RSAKeyValue `xml:"ds:RSAKeyValue"`
+	XMLName     xml.Name `xml:"ds:KeyValue"`
+	RSAKeyValue RSAKeyValue
 }
 
 type RSAKeyValue struct {
@@ -64,14 +64,14 @@ type Transforms struct {
 }
 
 type Signature struct {
-	XMLName        xml.Name       `xml:"ds:Signature"`
-	XmlnsDs        string         `xml:"xmlns:ds,attr"`
-	XmlnsXades     string         `xml:"xmlns:xades,attr,omitempty"`
-	ID             string         `xml:"Id,attr"`
-	SignedInfo     SignedInfo     `xml:"ds:SignedInfo"`
-	SignatureValue SignatureValue `xml:"ds:SignatureValue"`
-	KeyInfo        KeyInfo        `xml:"ds:KeyInfo"`
-	Object         Object         `xml:"ds:Object"`
+	XMLName        xml.Name `xml:"ds:Signature"`
+	XmlnsDs        string   `xml:"xmlns:ds,attr"`
+	XmlnsEtsi      string   `xml:"xmlns:etsi,attr,omitempty"` 
+	ID             string   `xml:"Id,attr"`
+	SignedInfo     SignedInfo
+	SignatureValue SignatureValue
+	KeyInfo        KeyInfo
+	Object         Object
 }
 
 type SignatureValue struct {
@@ -81,65 +81,65 @@ type SignatureValue struct {
 }
 
 type Object struct {
-	XMLName              xml.Name             `xml:"ds:Object"`
-	ID                   string               `xml:"Id,attr"`
-	QualifyingProperties QualifyingProperties `xml:"xades:QualifyingProperties"`
+	XMLName              xml.Name `xml:"ds:Object"`
+	ID                   string   `xml:"Id,attr"`
+	QualifyingProperties QualifyingProperties
 }
 
-// XAdES Types
+// XAdES Types (Using 'etsi' prefix to match reference library)
 
 type QualifyingProperties struct {
-	XMLName          xml.Name         `xml:"xades:QualifyingProperties"`
-	XmlnsXades       string           `xml:"xmlns:xades,attr"`
-	Target           string           `xml:"Target,attr"`
-	SignedProperties SignedProperties `xml:"xades:SignedProperties"`
+	XMLName          xml.Name `xml:"etsi:QualifyingProperties"`
+	XmlnsEtsi        string   `xml:"xmlns:etsi,attr,omitempty"` // explicit ns if needed here
+	Target           string   `xml:"Target,attr"`
+	SignedProperties SignedProperties
 }
 
 type SignedProperties struct {
-	XMLName                    xml.Name                   `xml:"xades:SignedProperties"`
-	ID                         string                     `xml:"Id,attr"`
-	SignedSignatureProperties  SignedSignatureProperties  `xml:"xades:SignedSignatureProperties"`
-	SignedDataObjectProperties SignedDataObjectProperties `xml:"xades:SignedDataObjectProperties"`
+	XMLName                    xml.Name `xml:"etsi:SignedProperties"`
+	ID                         string   `xml:"Id,attr"`
+	SignedSignatureProperties  SignedSignatureProperties
+	SignedDataObjectProperties SignedDataObjectProperties
 }
 
 type SignedSignatureProperties struct {
-	XMLName            xml.Name           `xml:"xades:SignedSignatureProperties"`
-	SigningTime        string             `xml:"xades:SigningTime"`
-	SigningCertificate SigningCertificate `xml:"xades:SigningCertificate"`
+	XMLName            xml.Name `xml:"etsi:SignedSignatureProperties"`
+	SigningTime        string   `xml:"etsi:SigningTime"`
+	SigningCertificate SigningCertificate
 }
 
 type SigningCertificate struct {
-	XMLName xml.Name `xml:"xades:SigningCertificate"`
-	Cert    Cert     `xml:"xades:Cert"`
+	XMLName xml.Name `xml:"etsi:SigningCertificate"`
+	Cert    Cert
 }
 
 type Cert struct {
-	XMLName      xml.Name     `xml:"xades:Cert"`
-	CertDigest   CertDigest   `xml:"xades:CertDigest"`
-	IssuerSerial IssuerSerial `xml:"xades:IssuerSerial"`
+	XMLName      xml.Name `xml:"etsi:Cert"`
+	CertDigest   CertDigest
+	IssuerSerial IssuerSerial
 }
 
 type CertDigest struct {
-	XMLName      xml.Name        `xml:"xades:CertDigest"`
+	XMLName      xml.Name        `xml:"etsi:CertDigest"`
 	DigestMethod AlgorithmMethod `xml:"ds:DigestMethod"`
 	DigestValue  string          `xml:"ds:DigestValue"`
 }
 
 type IssuerSerial struct {
-	XMLName          xml.Name `xml:"xades:IssuerSerial"`
+	XMLName          xml.Name `xml:"etsi:IssuerSerial"`
 	X509IssuerName   string   `xml:"ds:X509IssuerName"`
 	X509SerialNumber string   `xml:"ds:X509SerialNumber"`
 }
 
 type SignedDataObjectProperties struct {
-	XMLName          xml.Name         `xml:"xades:SignedDataObjectProperties"`
-	DataObjectFormat DataObjectFormat `xml:"xades:DataObjectFormat"`
+	XMLName          xml.Name `xml:"etsi:SignedDataObjectProperties"`
+	DataObjectFormat DataObjectFormat
 }
 
 type DataObjectFormat struct {
-	XMLName         xml.Name `xml:"xades:DataObjectFormat"`
+	XMLName         xml.Name `xml:"etsi:DataObjectFormat"`
 	ObjectReference string   `xml:"ObjectReference,attr"`
-	Description     string   `xml:"xades:Description"`
-	MimeType        string   `xml:"xades:MimeType"`
-	Encoding        string   `xml:"xades:Encoding"`
+	Description     string   `xml:"etsi:Description"`
+	MimeType        string   `xml:"etsi:MimeType"`
+	Encoding        string   `xml:"etsi:Encoding"`
 }

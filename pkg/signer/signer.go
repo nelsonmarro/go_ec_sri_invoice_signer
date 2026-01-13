@@ -74,7 +74,7 @@ func signDocument(docXML string, p12Data []byte, rootTagName string, options *Si
 	// We use the raw cleaned XML bytes for the hash.
 	// We can try to rely on C14N to produce the byte stream, but we need to *store* that result as the final XML doc.
 	docCanonical := []byte(cleanXML)
-	docHash := crypto.SHA256(docCanonical)
+	docHash := crypto.SHA1(docCanonical)
 
 	// IDs
 	docTagId := "comprobante"
@@ -118,10 +118,13 @@ func signDocument(docXML string, p12Data []byte, rootTagName string, options *Si
 	if err != nil {
 		return "", fmt.Errorf("%w (KeyInfo): %v", ErrCanonicalization, err)
 	}
-	keyInfoHash := crypto.SHA256(keyInfoCanonical)
+	keyInfoHash := crypto.SHA1(keyInfoCanonical)
 
 	// 3. Build SignedProperties
-	signingTime := time.Now().Format("2006-01-02T15:04:05-07:00") // ISO8601 with offset
+	// Force Ecuador Timezone (UTC-5)
+	loc := time.FixedZone("UTC-5", -5*60*60)
+	signingTime := time.Now().In(loc).Format("2006-01-02T15:04:05-07:00")
+
 	signedProperties := types.SignedProperties{
 		ID: signedPropertiesTagId,
 		SignedSignatureProperties: types.SignedSignatureProperties{
@@ -151,14 +154,18 @@ func signDocument(docXML string, p12Data []byte, rootTagName string, options *Si
 
 	// SignedProperties Hash
 	signedPropsBytes, _ := xml.Marshal(signedProperties)
-	// Inject namespaces xades and ds
-	signedPropsWithNs := ensureNamespace(signedPropsBytes, "xades", types.XadesNamespace)
-	signedPropsWithNs = ensureNamespace(signedPropsWithNs, "ds", types.DsNamespace)
+	// Inject namespaces: etsi (for SignedProperties) and ds (nested)
+	// Note: xml.Marshal with 'xml:"etsi:..."' tags generates <etsi:SignedProperties ...>
+	// We need to ensure xmlns:etsi is present.
+	signedPropsWithNs := ensureNamespace(signedPropsBytes, "etsi", types.EtsiNamespace)
+	signedPropsWithNs = ensureNamespace(signedPropsWithNs, "ds", types.DsNamespace) // cert digest is ds
+	
+	// Canonicalize
 	signedPropsCanonical, err := c14n.Canonicalize(signedPropsWithNs)
 	if err != nil {
 		return "", fmt.Errorf("%w (SignedProperties): %v", ErrCanonicalization, err)
 	}
-	signedPropsHash := crypto.SHA256(signedPropsCanonical)
+	signedPropsHash := crypto.SHA1(signedPropsCanonical)
 
 	// 4. Build SignedInfo
 	signedInfo := types.SignedInfo{
@@ -172,7 +179,6 @@ func signDocument(docXML string, p12Data []byte, rootTagName string, options *Si
 				Transforms: &types.Transforms{
 					Transform: []types.AlgorithmMethod{
 						{Algorithm: types.AlgorithmTransform},
-						// Removed C14N transform for document body
 					},
 				},
 				DigestMethod: types.AlgorithmMethod{Algorithm: types.AlgorithmDigest},
@@ -210,14 +216,7 @@ func signDocument(docXML string, p12Data []byte, rootTagName string, options *Si
 	signature := types.Signature{
 		XMLName:    xml.Name{Local: "ds:Signature"},
 		XmlnsDs:    types.DsNamespace,
-		XmlnsXades: types.XadesNamespace, // Usually not on Signature, but QualifyingProperties. Let's check types.
-		// Wait, types.Signature doesn't haveXmlnsXades usually. 
-		// Looking at types.go: 
-		// type Signature struct {
-		// 	XmlnsDs        string   `xml:"xmlns:ds,attr"`
-		//  ...
-		// }
-		// We'll stick to types definition.
+		XmlnsEtsi:  types.EtsiNamespace, // Explicitly declare etsi namespace on root Signature
 		ID:         signatureTagId,
 		SignedInfo: signedInfo,
 		SignatureValue: types.SignatureValue{
@@ -228,18 +227,12 @@ func signDocument(docXML string, p12Data []byte, rootTagName string, options *Si
 		Object: types.Object{
 			ID: signatureObjectTagId,
 			QualifyingProperties: types.QualifyingProperties{
-				XmlnsXades:       types.XadesNamespace,
+				XmlnsEtsi:        types.EtsiNamespace, // Redundant but harmless, ensures struct consistency
 				Target:           "#" + signatureTagId,
 				SignedProperties: signedProperties,
 			},
 		},
 	}
-	
-	// Fix xmlns:xades injection if needed.
-	// In types.go:
-	// type QualifyingProperties struct {
-	// 	XMLName          xml.Name `xml:"xades:QualifyingProperties"`
-	// 	XmlnsXades       string   `xml:"xmlns:xades,attr"`
 
 	// Marshal final signature (no indentation/newlines)
 	signatureBytes, err := xml.Marshal(signature)
@@ -259,8 +252,8 @@ func signDocument(docXML string, p12Data []byte, rootTagName string, options *Si
 	// Replace KeyInfo with canonicalized version
 	finalSignatureStr = replaceTag(finalSignatureStr, "ds:KeyInfo", string(keyInfoCanonical))
 
-	// Replace SignedProperties with canonicalized version
-	finalSignatureStr = replaceTag(finalSignatureStr, "xades:SignedProperties", string(signedPropsCanonical))
+	// Replace SignedProperties with canonicalized version (Note: Tag is etsi:SignedProperties now)
+	finalSignatureStr = replaceTag(finalSignatureStr, "etsi:SignedProperties", string(signedPropsCanonical))
 
 	// 6. Insert into Document
 	// Find the LAST </rootTagName> and insert before it
@@ -326,14 +319,13 @@ func ensureNamespace(xmlData []byte, prefix, uri string) []byte {
 	}
 
 	firstSpace := strings.IndexByte(s, ' ')
-		if firstSpace == -1 || firstSpace > firstTagEnd {
-			// No attributes, insert at end of tag name
-			// But tag name might be <ds:Tag>
-			// Insert before '>'
-			return []byte(s[:firstTagEnd] + fmt.Sprintf(" %s=\"%s\"", nsAttr, uri) + s[firstTagEnd:])
-		}
-	
-		// Insert after tag name (at first space)
-		return []byte(s[:firstSpace] + fmt.Sprintf(" %s=\"%s\"", nsAttr, uri) + s[firstSpace:])
+	if firstSpace == -1 || firstSpace > firstTagEnd {
+		// No attributes, insert at end of tag name
+		// But tag name might be <ds:Tag>
+		// Insert before '>'
+		return []byte(s[:firstTagEnd] + fmt.Sprintf(" %s=\"" + uri + "\"", nsAttr) + s[firstTagEnd:])
 	}
-	
+
+	// Insert after tag name (at first space)
+	return []byte(s[:firstSpace] + fmt.Sprintf(" %s=\"" + uri + "\"", nsAttr) + s[firstSpace:])
+}

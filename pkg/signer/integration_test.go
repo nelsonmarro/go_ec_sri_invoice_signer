@@ -88,12 +88,12 @@ func TestIntegrationSRI2026(t *testing.T) {
 		t.Fatalf("Signing failed: %v", err)
 	}
 
-	// 1. Verify Algorithms (Hybrid SRI 2026)
+	// 1. Verify Algorithms (SHA1)
 	if !strings.Contains(signedXml, "http://www.w3.org/2000/09/xmldsig#rsa-sha1") {
 		t.Error("Missing RSA-SHA1 SignatureMethod")
 	}
-	if !strings.Contains(signedXml, "http://www.w3.org/2001/04/xmlenc#sha256") {
-		t.Error("Missing SHA256 DigestMethod")
+	if !strings.Contains(signedXml, "http://www.w3.org/2000/09/xmldsig#sha1") {
+		t.Error("Missing SHA1 DigestMethod")
 	}
 
 	// 2. Verify Transforms
@@ -104,18 +104,18 @@ func TestIntegrationSRI2026(t *testing.T) {
 		t.Error("Missing C14N transform in document reference")
 	}
 
-	// 3. Verify XAdES structure
-	if !strings.Contains(signedXml, "<xades:SignedProperties") {
-		t.Error("Missing xades:SignedProperties")
+	// 3. Verify XAdES structure (using etsi prefix now)
+	if !strings.Contains(signedXml, "<etsi:SignedProperties") {
+		t.Error("Missing etsi:SignedProperties")
 	}
-	if !strings.Contains(signedXml, "<xades:QualifyingProperties") {
-		t.Error("Missing xades:QualifyingProperties")
+	if !strings.Contains(signedXml, "<etsi:QualifyingProperties") {
+		t.Error("Missing etsi:QualifyingProperties")
 	}
 
 	// 4. Verify SigningTime format (must have offset)
 	// Example: 2026-01-12T15:04:05-05:00
-	if !strings.Contains(signedXml, "<xades:SigningTime>") {
-		t.Error("Missing xades:SigningTime")
+	if !strings.Contains(signedXml, "<etsi:SigningTime>") {
+		t.Error("Missing etsi:SigningTime")
 	}
 	// Basic regex-like check for offset: T...[+-]XX:XX
 	if !strings.Contains(signedXml, ":") || (!strings.Contains(signedXml, "+") && !strings.Contains(signedXml, "-")) {
@@ -131,10 +131,8 @@ func TestIntegrationSRI2026(t *testing.T) {
 	}
 
 	// 6. Verify IssuerName has no spaces after commas
-	// We'll check for a common pattern like "CN=...,O=..."
 	if strings.Contains(signedXml, ", ") && strings.Contains(signedXml, "ds:X509IssuerName") {
 		// This might trigger if the cert itself has spaces in values, but usually it detects the delimiter
-		// For Test.p12 we know the issuer.
 	}
 
 	// Save to file for manual inspection if needed
