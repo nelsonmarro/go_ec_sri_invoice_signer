@@ -74,7 +74,7 @@ func signDocument(docXML string, p12Data []byte, rootTagName string, options *Si
 	// We use the raw cleaned XML bytes for the hash.
 	// We can try to rely on C14N to produce the byte stream, but we need to *store* that result as the final XML doc.
 	docCanonical := []byte(cleanXML)
-	docHash := crypto.SHA256(docCanonical)
+	docHash := crypto.SHA1(docCanonical)
 
 	// IDs
 	docTagId := "comprobante"
@@ -118,7 +118,7 @@ func signDocument(docXML string, p12Data []byte, rootTagName string, options *Si
 	if err != nil {
 		return "", fmt.Errorf("%w (KeyInfo): %v", ErrCanonicalization, err)
 	}
-	keyInfoHash := crypto.SHA256(keyInfoCanonical)
+	keyInfoHash := crypto.SHA1(keyInfoCanonical)
 
 	// 3. Build SignedProperties
 	signingTime := time.Now().Format("2006-01-02T15:04:05-07:00") // ISO8601 with offset
@@ -158,7 +158,7 @@ func signDocument(docXML string, p12Data []byte, rootTagName string, options *Si
 	if err != nil {
 		return "", fmt.Errorf("%w (SignedProperties): %v", ErrCanonicalization, err)
 	}
-	signedPropsHash := crypto.SHA256(signedPropsCanonical)
+	signedPropsHash := crypto.SHA1(signedPropsCanonical)
 
 	// 4. Build SignedInfo
 	signedInfo := types.SignedInfo{
@@ -326,13 +326,14 @@ func ensureNamespace(xmlData []byte, prefix, uri string) []byte {
 	}
 
 	firstSpace := strings.IndexByte(s, ' ')
-	if firstSpace == -1 || firstSpace > firstTagEnd {
-		// No attributes, insert at end of tag name
-		// But tag name might be <ds:Tag>
-		// Insert before '>'
-		return []byte(s[:firstTagEnd] + fmt.Sprintf(" %s=\"" + uri + "\"", nsAttr) + s[firstTagEnd:])
+		if firstSpace == -1 || firstSpace > firstTagEnd {
+			// No attributes, insert at end of tag name
+			// But tag name might be <ds:Tag>
+			// Insert before '>'
+			return []byte(s[:firstTagEnd] + fmt.Sprintf(" %s=\"%s\"", nsAttr, uri) + s[firstTagEnd:])
+		}
+	
+		// Insert after tag name (at first space)
+		return []byte(s[:firstSpace] + fmt.Sprintf(" %s=\"%s\"", nsAttr, uri) + s[firstSpace:])
 	}
-
-	// Insert after tag name (at first space)
-	return []byte(s[:firstSpace] + fmt.Sprintf(" %s=\"" + uri + "\"", nsAttr) + s[firstSpace:])
-}
+	

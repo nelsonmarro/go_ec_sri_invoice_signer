@@ -41,12 +41,12 @@ func TestSignInvoice(t *testing.T) {
 	}
 	
 	// SRI 2026 Checks:
-	// 1. SHA256 Algorithm
-	if !strings.Contains(signedXml, "http://www.w3.org/2001/04/xmldsig-more#rsa-sha256") {
-		t.Error("expected SHA256 signature method")
+	// 1. SHA1 Algorithm (Back to SHA1 for better compatibility as requested)
+	if !strings.Contains(signedXml, "http://www.w3.org/2000/09/xmldsig#rsa-sha1") {
+		t.Error("expected SHA1 signature method")
 	}
-	if !strings.Contains(signedXml, "http://www.w3.org/2001/04/xmlenc#sha256") {
-		t.Error("expected SHA256 digest method")
+	if !strings.Contains(signedXml, "http://www.w3.org/2000/09/xmldsig#sha1") {
+		t.Error("expected SHA1 digest method")
 	}
 
 	// 2. Flattening (no spaces between root level tags)
