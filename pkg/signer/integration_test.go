@@ -88,12 +88,12 @@ func TestIntegrationSRI2026(t *testing.T) {
 		t.Fatalf("Signing failed: %v", err)
 	}
 
-	// 1. Verify Algorithms (SHA1)
+	// 1. Verify Algorithms (Hybrid SRI 2026)
 	if !strings.Contains(signedXml, "http://www.w3.org/2000/09/xmldsig#rsa-sha1") {
 		t.Error("Missing RSA-SHA1 SignatureMethod")
 	}
-	if !strings.Contains(signedXml, "http://www.w3.org/2000/09/xmldsig#sha1") {
-		t.Error("Missing SHA1 DigestMethod")
+	if !strings.Contains(signedXml, "http://www.w3.org/2001/04/xmlenc#sha256") {
+		t.Error("Missing SHA256 DigestMethod")
 	}
 
 	// 2. Verify Transforms

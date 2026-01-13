@@ -80,9 +80,9 @@ func GetIssuerName(cert *x509.Certificate) string {
 	return strings.ReplaceAll(cert.Issuer.String(), ", ", ",")
 }
 
-// GetCertHash returns the base64 encoded SHA1 hash of the raw certificate.
+// GetCertHash returns the base64 encoded SHA256 hash of the raw certificate.
 func GetCertHash(cert *x509.Certificate) string {
-	h := sha1.New()
+	h := sha256.New()
 	h.Write(cert.Raw)
 	return base64.StdEncoding.EncodeToString(h.Sum(nil))
 }
