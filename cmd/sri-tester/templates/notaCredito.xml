@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<notaCredito id="comprobante" version="1.1.0">
+    <infoTributaria>
+        <ambiente>{{ambiente}}</ambiente>
+        <tipoEmision>1</tipoEmision>
+        <razonSocial>{{razonSocial}}</razonSocial>
+        <nombreComercial>{{nombreComercial}}</nombreComercial>
+        <ruc>{{ruc}}</ruc>
+        <claveAcceso>{{claveAcceso}}</claveAcceso>
+        <codDoc>04</codDoc>
+        <estab>{{estab}}</estab>
+        <ptoEmi>{{ptoEmi}}</ptoEmi>
+        <secuencial>{{secuencial}}</secuencial>
+        <dirMatriz>{{dirMatriz}}</dirMatriz>
+    </infoTributaria>
+    <infoNotaCredito>
+        <fechaEmision>{{fechaEmision}}</fechaEmision>
+        <dirEstablecimiento>{{dirEstablecimiento}}</dirEstablecimiento>
+        <tipoIdentificacionComprador>05</tipoIdentificacionComprador>
+        <razonSocialComprador>CONSUMIDOR FINAL</razonSocialComprador>
+        <identificacionComprador>9999999999</identificacionComprador>
+        <obligadoContabilidad>SI</obligadoContabilidad>
+        <codDocModificado>01</codDocModificado>
+        <numDocModificado>001-001-000000001</numDocModificado>
+        <fechaEmisionDocSustento>01/01/2026</fechaEmisionDocSustento>
+        <totalSinImpuestos>10.00</totalSinImpuestos>
+        <valorModificacion>11.50</valorModificacion>
+        <moneda>DOLAR</moneda>
+        <totalConImpuestos>
+            <totalImpuesto>
+                <codigo>2</codigo>
+                <codigoPorcentaje>4</codigoPorcentaje>
+                <baseImponible>10.00</baseImponible>
+                <valor>1.50</valor>
+            </totalImpuesto>
+        </totalConImpuestos>
+        <motivo>DEVOLUCION</motivo>
+    </infoNotaCredito>
+    <detalles>
+        <detalle>
+            <codigoInterno>001</codigoInterno>
+            <descripcion>PRUEBA NOTA CREDITO</descripcion>
+            <cantidad>1.00</cantidad>
+            <precioUnitario>10.00</precioUnitario>
+            <descuento>0.00</descuento>
+            <precioTotalSinImpuesto>10.00</precioTotalSinImpuesto>
+            <impuestos>
+                <impuesto>
+                    <codigo>2</codigo>
+                    <codigoPorcentaje>4</codigoPorcentaje>
+                    <tarifa>15</tarifa>
+                    <baseImponible>10.00</baseImponible>
+                    <valor>1.50</valor>
+                </impuesto>
+            </impuestos>
+        </detalle>
+    </detalles>
+</notaCredito>

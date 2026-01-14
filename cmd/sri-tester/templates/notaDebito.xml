@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<notaDebito id="comprobante" version="1.0.0">
+    <infoTributaria>
+        <ambiente>{{ambiente}}</ambiente>
+        <tipoEmision>1</tipoEmision>
+        <razonSocial>{{razonSocial}}</razonSocial>
+        <nombreComercial>{{nombreComercial}}</nombreComercial>
+        <ruc>{{ruc}}</ruc>
+        <claveAcceso>{{claveAcceso}}</claveAcceso>
+        <codDoc>05</codDoc>
+        <estab>{{estab}}</estab>
+        <ptoEmi>{{ptoEmi}}</ptoEmi>
+        <secuencial>{{secuencial}}</secuencial>
+        <dirMatriz>{{dirMatriz}}</dirMatriz>
+    </infoTributaria>
+    <infoNotaDebito>
+        <fechaEmision>{{fechaEmision}}</fechaEmision>
+        <dirEstablecimiento>{{dirEstablecimiento}}</dirEstablecimiento>
+        <tipoIdentificacionComprador>05</tipoIdentificacionComprador>
+        <razonSocialComprador>CONSUMIDOR FINAL</razonSocialComprador>
+        <identificacionComprador>9999999999</identificacionComprador>
+        <obligadoContabilidad>SI</obligadoContabilidad>
+        <codDocModificado>01</codDocModificado>
+        <numDocModificado>001-001-000000001</numDocModificado>
+        <fechaEmisionDocSustento>01/01/2026</fechaEmisionDocSustento>
+        <totalSinImpuestos>10.00</totalSinImpuestos>
+        <impuestos>
+            <impuesto>
+                <codigo>2</codigo>
+                <codigoPorcentaje>4</codigoPorcentaje>
+                <tarifa>15</tarifa>
+                <baseImponible>10.00</baseImponible>
+                <valor>1.50</valor>
+            </impuesto>
+        </impuestos>
+        <valorTotal>11.50</valorTotal>
+        <pagos>
+            <pago>
+                <formaPago>01</formaPago>
+                <total>11.50</total>
+            </pago>
+        </pagos>
+    </infoNotaDebito>
+    <motivos>
+        <motivo>
+            <razon>INTERES POR MORA</razon>
+            <valor>10.00</valor>
+        </motivo>
+    </motivos>
+</notaDebito>

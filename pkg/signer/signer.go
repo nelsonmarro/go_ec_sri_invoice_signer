@@ -1,331 +1,126 @@
-// Package signer provides functions to sign various types of electronic documents
+// Package signer provides functions to sign electronic documents (Factura, Nota de Crédito, etc.)
+// compliant with the Ecuadorian SRI (Servicio de Rentas Internas) specifications.
 package signer
 
 import (
-	"crypto/rand"
-	"encoding/xml"
+	"crypto/rsa"
+	"crypto/x509"
+	"encoding/base64"
 	"fmt"
-	"regexp"
-	"strings"
-	"time"
 
-	"github.com/nelsonmarro/go_ec_sri_invoice_signer/pkg/c14n"
-	"github.com/nelsonmarro/go_ec_sri_invoice_signer/pkg/crypto"
-	"github.com/nelsonmarro/go_ec_sri_invoice_signer/pkg/types"
+	libcrypto "github.com/nelsonmarro/go_ec_sri_invoice_signer/pkg/crypto"
+	dsig "github.com/russellhaering/goxmldsig"
 )
 
+// HashAlgorithm defines the digest algorithm to use for signing.
+type HashAlgorithm int
+
+const (
+	SHA1 HashAlgorithm = iota
+	SHA256
+)
+
+// SignOptions configuration for the signing process.
 type SignOptions struct {
-	Password string
+	Password  string
+	Algorithm HashAlgorithm
 }
 
-// SignInvoice signs a Factura (Invoice) XML document.
+// SRIKeyStore adapts the rsa.PrivateKey and Certificate for goxmldsig.
+type SRIKeyStore struct {
+	privateKey *rsa.PrivateKey
+	cert       []byte
+}
+
+func (s *SRIKeyStore) GetKeyPair() (*rsa.PrivateKey, []byte, error) {
+	return s.privateKey, s.cert, nil
+}
+
+// Public API Functions
+
 func SignInvoice(xmlDoc string, p12Data []byte, options *SignOptions) (string, error) {
 	return signDocument(xmlDoc, p12Data, "factura", options)
 }
 
-// SignCreditNote signs a Nota de Crédito (Credit Note) XML document.
 func SignCreditNote(xmlDoc string, p12Data []byte, options *SignOptions) (string, error) {
 	return signDocument(xmlDoc, p12Data, "notaCredito", options)
 }
 
-// SignDebitNote signs a Nota de Débito (Debit Note) XML document.
 func SignDebitNote(xmlDoc string, p12Data []byte, options *SignOptions) (string, error) {
 	return signDocument(xmlDoc, p12Data, "notaDebito", options)
 }
 
-// SignDeliveryGuide signs a Guía de Remisión (Delivery Guide) XML document.
 func SignDeliveryGuide(xmlDoc string, p12Data []byte, options *SignOptions) (string, error) {
 	return signDocument(xmlDoc, p12Data, "guiaRemision", options)
 }
 
-// SignWithholdingCertificate signs a Comprobante de Retención (Withholding Certificate) XML document.
 func SignWithholdingCertificate(xmlDoc string, p12Data []byte, options *SignOptions) (string, error) {
 	return signDocument(xmlDoc, p12Data, "comprobanteRetencion", options)
 }
 
+// Core Signing Logic
+
 func signDocument(docXML string, p12Data []byte, rootTagName string, options *SignOptions) (string, error) {
-	pwd := ""
-	if options != nil {
-		pwd = options.Password
-	}
-
-	key, cert, err := crypto.ParsePKCS12(p12Data, pwd)
+	pwd, algo := parseOptions(options)
+	key, cert, err := libcrypto.ParsePKCS12(p12Data, pwd)
 	if err != nil {
-		return "", fmt.Errorf("%w: %v", ErrParsingP12, err)
+		return "", fmt.Errorf("failed to parse PKCS#12 file: %w", err)
 	}
-
-	// 0. Pre-process: Flatten the XML
-	// Remove whitespace between tags to ensure a "flattened" document.
-	// This helps with C14N consistency and SRI validation.
-	// Regex: >\s+< -> ><
-	re := regexp.MustCompile(`>\s+<`)
-	docXML = re.ReplaceAllString(docXML, "><")
-	docXML = strings.TrimSpace(docXML)
-
-	// Clean XML: Remove declaration and leading/trailing whitespace
-	// SRI hashes the node referenced by ID (e.g. #comprobante), not the whole file.
-	cleanXML := docXML
-	if idx := strings.Index(cleanXML, "?>"); idx != -1 {
-		cleanXML = cleanXML[idx+2:]
-	}
-	cleanXML = strings.TrimSpace(cleanXML)
-
-	// 1. Hash Document Body (No explicit C14N for body, trusting the clean source)
-	// We use the raw cleaned XML bytes for the hash.
-	// We can try to rely on C14N to produce the byte stream, but we need to *store* that result as the final XML doc.
-	docCanonical := []byte(cleanXML)
-	docHash := crypto.SHA1(docCanonical)
-
-	// IDs
-	docTagId := "comprobante"
-	// We use random IDs. Node uses uuid. We'll use a simple random string generator.
-	docTagRefId := fmt.Sprintf("DocumentRef-%s", randomID())
-	keyInfoTagId := fmt.Sprintf("Certificate-%s", randomID())
-	keyInfoRefTagId := fmt.Sprintf("CertificateRef-%s", randomID())
-	signedInfoTagId := fmt.Sprintf("SignedInfo-%s", randomID())
-	signedPropertiesRefTagId := fmt.Sprintf("SignedPropertiesRef-%s", randomID())
-	signedPropertiesTagId := fmt.Sprintf("SignedProperties-%s", randomID())
-	signatureTagId := fmt.Sprintf("Signature-%s", randomID())
-	signatureObjectTagId := fmt.Sprintf("SignatureObject-%s", randomID())
-	signatureValueTagId := fmt.Sprintf("SignatureValue-%s", randomID())
-
-	// Certificate Data
-	modulus, exponent := crypto.GetPrivateKeyData(key)
-	certContent := crypto.GetCertContent(cert)
-	certHash := crypto.GetCertHash(cert)
-	issuerName := crypto.GetIssuerName(cert)
-	serialNumber := cert.SerialNumber.String()
-
-	// 2. Build KeyInfo
-	keyInfo := types.KeyInfo{
-		ID: keyInfoTagId,
-		X509Data: types.X509Data{
-			X509Certificate: certContent,
-		},
-		KeyValue: types.KeyValue{
-			RSAKeyValue: types.RSAKeyValue{
-				Modulus:  modulus,
-				Exponent: exponent,
-			},
-		},
-	}
-
-	// KeyInfo Hash
-	keyInfoBytes, _ := xml.Marshal(keyInfo)
-	// Hack: inject xmlns:ds if missing for C14N isolated
-	keyInfoWithNs := ensureNamespace(keyInfoBytes, "ds", types.DsNamespace)
-	keyInfoCanonical, err := c14n.Canonicalize(keyInfoWithNs)
-	if err != nil {
-		return "", fmt.Errorf("%w (KeyInfo): %v", ErrCanonicalization, err)
-	}
-	keyInfoHash := crypto.SHA1(keyInfoCanonical)
-
-	// 3. Build SignedProperties
-	// Force Ecuador Timezone (UTC-5)
-	loc := time.FixedZone("UTC-5", -5*60*60)
-	signingTime := time.Now().In(loc).Format("2006-01-02T15:04:05-07:00")
-
-	signedProperties := types.SignedProperties{
-		ID: signedPropertiesTagId,
-		SignedSignatureProperties: types.SignedSignatureProperties{
-			SigningTime: signingTime,
-			SigningCertificate: types.SigningCertificate{
-				Cert: types.Cert{
-					CertDigest: types.CertDigest{
-						DigestMethod: types.AlgorithmMethod{Algorithm: types.AlgorithmDigest},
-						DigestValue:  certHash,
-					},
-					IssuerSerial: types.IssuerSerial{
-						X509IssuerName:   issuerName,
-						X509SerialNumber: serialNumber,
-					},
-				},
-			},
-		},
-		SignedDataObjectProperties: types.SignedDataObjectProperties{
-			DataObjectFormat: types.DataObjectFormat{
-				ObjectReference: "#" + docTagRefId,
-				Description:     "Firma digital",
-				MimeType:        "text/xml",
-				Encoding:        "UTF-8",
-			},
-		},
-	}
-
-	// SignedProperties Hash
-	signedPropsBytes, _ := xml.Marshal(signedProperties)
-	// Inject namespaces: etsi (for SignedProperties) and ds (nested)
-	// Note: xml.Marshal with 'xml:"etsi:..."' tags generates <etsi:SignedProperties ...>
-	// We need to ensure xmlns:etsi is present.
-	signedPropsWithNs := ensureNamespace(signedPropsBytes, "etsi", types.EtsiNamespace)
-	signedPropsWithNs = ensureNamespace(signedPropsWithNs, "ds", types.DsNamespace) // cert digest is ds
-	
-	// Canonicalize
-	signedPropsCanonical, err := c14n.Canonicalize(signedPropsWithNs)
-	if err != nil {
-		return "", fmt.Errorf("%w (SignedProperties): %v", ErrCanonicalization, err)
-	}
-	signedPropsHash := crypto.SHA1(signedPropsCanonical)
-
-	// 4. Build SignedInfo
-	signedInfo := types.SignedInfo{
-		ID:                     signedInfoTagId,
-		CanonicalizationMethod: types.AlgorithmMethod{Algorithm: types.AlgorithmC14N},
-		SignatureMethod:        types.AlgorithmMethod{Algorithm: types.AlgorithmSignature},
-		References: []types.Reference{
-			{
-				ID:  docTagRefId,
-				URI: "#" + docTagId,
-				Transforms: &types.Transforms{
-					Transform: []types.AlgorithmMethod{
-						{Algorithm: types.AlgorithmTransform},
-					},
-				},
-				DigestMethod: types.AlgorithmMethod{Algorithm: types.AlgorithmDigest},
-				DigestValue:  docHash,
-			},
-			{
-				ID:           signedPropertiesRefTagId,
-				Type:         types.TypeSignedProperties,
-				URI:          "#" + signedPropertiesTagId,
-				DigestMethod: types.AlgorithmMethod{Algorithm: types.AlgorithmDigest},
-				DigestValue:  signedPropsHash,
-			},
-			{
-				ID:           keyInfoRefTagId,
-				URI:          "#" + keyInfoTagId,
-				DigestMethod: types.AlgorithmMethod{Algorithm: types.AlgorithmDigest},
-				DigestValue:  keyInfoHash,
-			},
-		},
-	}
-
-	// SignedInfo Signing
-	signedInfoBytes, _ := xml.Marshal(signedInfo)
-	signedInfoWithNs := ensureNamespace(signedInfoBytes, "ds", types.DsNamespace)
-	signedInfoCanonical, err := c14n.Canonicalize(signedInfoWithNs)
-	if err != nil {
-		return "", fmt.Errorf("%w (SignedInfo): %v", ErrCanonicalization, err)
-	}
-	signatureValue, err := crypto.Sign(signedInfoCanonical, key)
-	if err != nil {
-		return "", fmt.Errorf("%w: %v", ErrSigning, err)
-	}
-
-	// 5. Build Signature
-	signature := types.Signature{
-		XMLName:    xml.Name{Local: "ds:Signature"},
-		XmlnsDs:    types.DsNamespace,
-		XmlnsEtsi:  types.EtsiNamespace, // Explicitly declare etsi namespace on root Signature
-		ID:         signatureTagId,
-		SignedInfo: signedInfo,
-		SignatureValue: types.SignatureValue{
-			ID:    signatureValueTagId,
-			Value: signatureValue,
-		},
-		KeyInfo: keyInfo,
-		Object: types.Object{
-			ID: signatureObjectTagId,
-			QualifyingProperties: types.QualifyingProperties{
-				XmlnsEtsi:        types.EtsiNamespace, // Redundant but harmless, ensures struct consistency
-				Target:           "#" + signatureTagId,
-				SignedProperties: signedProperties,
-			},
-		},
-	}
-
-	// Marshal final signature (no indentation/newlines)
-	signatureBytes, err := xml.Marshal(signature)
-	if err != nil {
-		return "", fmt.Errorf("failed to marshal signature: %w", err)
-	}
-
-	// Optimization: Since SRI's Reference doesn't have C14N transform,
-	// we must ensure the XML we send is IDENTICAL to what we hashed.
-	// We replace the marshaled fragments with their canonicalized versions.
-	// To ensure the replacement works even if namespaces vary, we find the tags.
-	finalSignatureStr := string(signatureBytes)
-
-	// Replace SignedInfo with canonicalized version
-	finalSignatureStr = replaceTag(finalSignatureStr, "ds:SignedInfo", string(signedInfoCanonical))
-
-	// Replace KeyInfo with canonicalized version
-	finalSignatureStr = replaceTag(finalSignatureStr, "ds:KeyInfo", string(keyInfoCanonical))
-
-	// Replace SignedProperties with canonicalized version (Note: Tag is etsi:SignedProperties now)
-	finalSignatureStr = replaceTag(finalSignatureStr, "etsi:SignedProperties", string(signedPropsCanonical))
-
-	// 6. Insert into Document
-	// Find the LAST </rootTagName> and insert before it
-	closingTag := fmt.Sprintf("</%s>", rootTagName)
-	body := string(docCanonical)
-	idx := strings.LastIndex(body, closingTag)
-	if idx == -1 {
-		return "", fmt.Errorf("%w: %s", ErrMissingClosingTag, closingTag)
-	}
-
-	// Reconstruct final XML
-	header := ""
-	// If the original had a header, we construct a generic clean one or reuse.
-	// SRI accepts generic UTF-8 header.
-	if strings.Contains(docXML, "<?xml") {
-		header = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
-	}
-
-	finalXml := header + body[:idx] + finalSignatureStr + body[idx:]
-
-	return finalXml, nil
+	return signDocumentInternal(docXML, key, cert, rootTagName, algo)
 }
 
-func replaceTag(xmlStr, tagName, canonicalPart string) string {
-	startTag := "<" + tagName
-	endTag := "</" + tagName + ">"
-
-	startIdx := strings.Index(xmlStr, startTag)
-	endIdx := strings.Index(xmlStr, endTag)
-
-	if startIdx == -1 || endIdx == -1 {
-		return xmlStr
+// signDocumentInternal allows signing with already parsed keys (useful for testing without P12 files)
+// This function is internal to the package but accessible by tests in the same package.
+func signDocumentInternal(docXML string, key *rsa.PrivateKey, cert *x509.Certificate, rootTagName string, algo HashAlgorithm) (string, error) {
+	// 1. Prepare Document (Clean & Parse)
+	cleanXML := cleanXMLString(docXML)
+	root, err := parseRootElement(cleanXML)
+	if err != nil {
+		return "", err
 	}
+	ensureRootID(root)
 
-	return xmlStr[:startIdx] + canonicalPart + xmlStr[endIdx+len(endTag):]
-}
+	// 2. Determine Algorithms
+	digestURL, sigURL, cryptoHash, digestFn := getAlgorithmConfig(algo)
 
-func randomID() string {
-	b := make([]byte, 16)
-	if _, err := rand.Read(b); err != nil {
-		// Entropy source failure is fatal for signature generation
-		panic(fmt.Errorf("failed to generate random ID: %w", err))
+	// 3. Generate Unique IDs
+	ids := generateXadesIDs()
+
+	// 4. Calculate Document Hash
+	// Strategy: Hash the clean bytes directly. This matches the SRI's behavior after "Enveloped Signature" transform.
+	docHashB64 := digestFn([]byte(cleanXML))
+
+	// 5. Instantiate Canonicalizer (Inclusive C14N 1.0)
+	canon := dsig.MakeC14N10RecCanonicalizer()
+
+	// 6. Construct XAdES Components
+
+	// A. SignedProperties (etsi:SignedProperties)
+	spEl := buildSignedProperties(ids.SignedProps, ids.DocRef, cert, digestURL)
+	spCanonical, _ := canon.Canonicalize(spEl)
+	spHashB64 := digestFn(spCanonical)
+
+	// B. KeyInfo (ds:KeyInfo)
+	kiEl := buildKeyInfo(ids.KeyInfo, key, cert)
+	kiCanonical, _ := canon.Canonicalize(kiEl)
+	kiHashB64 := digestFn(kiCanonical)
+
+	// C. SignedInfo (ds:SignedInfo)
+	siEl := buildSignedInfo(ids.SigInfo, sigURL, digestURL, ids.DocRef, ids.SignedProps, ids.KeyInfo, docHashB64, spHashB64, kiHashB64)
+	siCanonical, _ := canon.Canonicalize(siEl)
+
+	// 7. Sign the SignedInfo
+	sigCtx := dsig.NewDefaultSigningContext(&SRIKeyStore{privateKey: key, cert: cert.Raw})
+	sigCtx.Hash = cryptoHash
+	signatureValue, err := sigCtx.SignString(string(siCanonical))
+	if err != nil {
+		return "", fmt.Errorf("crypto signing failed: %w", err)
 	}
-	return fmt.Sprintf("%x", b)
-}
+	sigValueB64 := base64.StdEncoding.EncodeToString(signatureValue)
 
-// ensureNamespace attempts to add xmlns:prefix="uri" to the root element if not present.
-// This is a rough hack for C14N context.
-func ensureNamespace(xmlData []byte, prefix, uri string) []byte {
-	// Check if xmlns:prefix is already there
-	s := string(xmlData)
-	nsAttr := fmt.Sprintf("xmlns:%s", prefix)
-	if strings.Contains(s, nsAttr) {
-		return xmlData
-	}
+	// 8. Assemble Final Signature
+	signature := buildFinalSignature(ids.Signature, ids.SigValue, ids.Object, siCanonical, sigValueB64, kiCanonical, spCanonical)
 
-	// Find first space after tag name or end of tag name
-	// <TagName ...
-	// <ds:TagName ...
-	firstTagEnd := strings.IndexByte(s, '>')
-	if firstTagEnd == -1 {
-		return xmlData
-	}
-
-	firstSpace := strings.IndexByte(s, ' ')
-	if firstSpace == -1 || firstSpace > firstTagEnd {
-		// No attributes, insert at end of tag name
-		// But tag name might be <ds:Tag>
-		// Insert before '>'
-		return []byte(s[:firstTagEnd] + fmt.Sprintf(" %s=\"" + uri + "\"", nsAttr) + s[firstTagEnd:])
-	}
-
-	// Insert after tag name (at first space)
-	return []byte(s[:firstSpace] + fmt.Sprintf(" %s=\"" + uri + "\"", nsAttr) + s[firstSpace:])
+	// 9. Inject Signature into Document
+	return injectSignature(cleanXML, rootTagName, signature, canon)
 }

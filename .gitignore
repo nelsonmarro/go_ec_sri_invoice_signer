@@ -18,11 +18,6 @@
 bin/
 dist/
 
-# Project specific
-testdata/key.pem
-testdata/cert.pem
-testdata/test.p12
-
 # IDEs
 .idea/
 .vscode/

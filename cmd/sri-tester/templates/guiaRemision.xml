@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<guiaRemision id="comprobante" version="1.1.0">
+    <infoTributaria>
+        <ambiente>{{ambiente}}</ambiente>
+        <tipoEmision>1</tipoEmision>
+        <razonSocial>{{razonSocial}}</razonSocial>
+        <nombreComercial>{{nombreComercial}}</nombreComercial>
+        <ruc>{{ruc}}</ruc>
+        <claveAcceso>{{claveAcceso}}</claveAcceso>
+        <codDoc>06</codDoc>
+        <estab>{{estab}}</estab>
+        <ptoEmi>{{ptoEmi}}</ptoEmi>
+        <secuencial>{{secuencial}}</secuencial>
+        <dirMatriz>{{dirMatriz}}</dirMatriz>
+    </infoTributaria>
+    <infoGuiaRemision>
+        <dirEstablecimiento>{{dirEstablecimiento}}</dirEstablecimiento>
+        <dirPartida>Quito</dirPartida>
+        <razonSocialTransportista>TRANSPORTISTA PRUEBA</razonSocialTransportista>
+        <tipoIdentificacionTransportista>05</tipoIdentificacionTransportista>
+        <rucTransportista>1712345678</rucTransportista>
+        <obligadoContabilidad>SI</obligadoContabilidad>
+        <fechaIniTransporte>{{fechaEmision}}</fechaIniTransporte>
+        <fechaFinTransporte>{{fechaEmision}}</fechaFinTransporte>
+        <placa>PBA1234</placa>
+    </infoGuiaRemision>
+    <destinatarios>
+        <destinatario>
+            <identificacionDestinatario>9999999999</identificacionDestinatario>
+            <razonSocialDestinatario>CONSUMIDOR FINAL</razonSocialDestinatario>
+            <dirDestinatario>Guayaquil</dirDestinatario>
+            <motivoTraslado>VENTA</motivoTraslado>
+            <detalles>
+                <detalle>
+                    <codigoInterno>001</codigoInterno>
+                    <descripcion>PRODUCTO 1</descripcion>
+                    <cantidad>10</cantidad>
+                </detalle>
+            </detalles>
+        </destinatario>
+    </destinatarios>
+</guiaRemision>

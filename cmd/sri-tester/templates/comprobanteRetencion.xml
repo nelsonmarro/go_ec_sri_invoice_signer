@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<comprobanteRetencion id="comprobante" version="1.0.0">
+    <infoTributaria>
+        <ambiente>{{ambiente}}</ambiente>
+        <tipoEmision>1</tipoEmision>
+        <razonSocial>{{razonSocial}}</razonSocial>
+        <nombreComercial>{{nombreComercial}}</nombreComercial>
+        <ruc>{{ruc}}</ruc>
+        <claveAcceso>{{claveAcceso}}</claveAcceso>
+        <codDoc>07</codDoc>
+        <estab>{{estab}}</estab>
+        <ptoEmi>{{ptoEmi}}</ptoEmi>
+        <secuencial>{{secuencial}}</secuencial>
+        <dirMatriz>{{dirMatriz}}</dirMatriz>
+    </infoTributaria>
+    <infoCompRetencion>
+        <fechaEmision>{{fechaEmision}}</fechaEmision>
+        <dirEstablecimiento>{{dirEstablecimiento}}</dirEstablecimiento>
+        <obligadoContabilidad>SI</obligadoContabilidad>
+        <tipoIdentificacionSujetoRetenido>05</tipoIdentificacionSujetoRetenido>
+        <razonSocialSujetoRetenido>PROVEEDOR PRUEBA</razonSocialSujetoRetenido>
+        <identificacionSujetoRetenido>9999999999</identificacionSujetoRetenido>
+        <periodoFiscal>01/2026</periodoFiscal>
+    </infoCompRetencion>
+    <impuestos>
+        <impuesto>
+            <codigo>1</codigo>
+            <codigoRetencion>312</codigoRetencion>
+            <baseImponible>100.00</baseImponible>
+            <porcentajeRetener>1.75</porcentajeRetener>
+            <valorRetenido>1.75</valorRetenido>
+            <codDocSustento>01</codDocSustento>
+            <numDocSustento>001001000000001</numDocSustento>
+            <fechaEmisionDocSustento>01/01/2026</fechaEmisionDocSustento>
+        </impuesto>
+    </impuestos>
+</comprobanteRetencion>

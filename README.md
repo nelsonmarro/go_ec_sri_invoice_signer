@@ -1,28 +1,29 @@
 # 🇪🇨 Go EC SRI Invoice Signer
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/nelsonmarro/go_ec_sri_invoice_signer.svg)](https://pkg.go.dev/github.com/nelsonmarro/go_ec_sri_invoice_signer)
-[![Go Report Card](https://goreportcard.com/badge/github.com/nelsonmarro/go_ec_sri_invoice_signer)](https://goreportcard.com/report/github.com/nelsonmarro/go_ec_sri_invoice_signer)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-A robust, pure Go implementation for signing electronic documents according to the **Ecuadorian SRI (Servicio de Rentas Internas)** standards. This library is a Go port of the original Node.js implementation [ec-sri-invoice-signer](https://github.com/bryancalisto/ec-sri-invoice-signer) by Bryan Calisto.
+Una implementación robusta y nativa en Go para la firma de documentos electrónicos del **SRI Ecuador**, cumpliendo estrictamente con los estándares **XAdES-BES** y **Canonicalización Inclusiva**.
+
+Esta librería soluciona los problemas comunes de "Firma Inválida" en Go al implementar correctamente la estructura de namespaces y algoritmos que exigen los validadores Java legacy del SRI.
 
 ---
 
-## 🚀 Features
+## 🚀 Características
 
-- **XAdES-BES Native**: Implements the specific signature structure required by SRI (including `QualifyingProperties` and `SignedProperties`).
-- **Complete Document Support**:
-  - 🧾 `Factura` (Invoice)
-  - 📉 `Nota de Crédito` (Credit Note)
-  - 📈 `Nota de Débito` (Debit Note)
-  - 🚛 `Guía de Remisión` (Delivery Guide)
-  - 💰 `Comprobante de Retención` (Withholding Certificate)
-- **Robust Security**: Uses `software.sslmate.com/src/go-pkcs12` for reliable PKCS#12 parsing.
-- **Pure Go**: No CGO dependencies, making it easy to cross-compile for any platform.
+- **XAdES-BES Nativo**: Genera la estructura de firma exacta (incluyendo `QualifyingProperties` y `SignedProperties` con prefijos correctos).
+- **Soporte Completo de Documentos**:
+  - 🧾 `Factura` (v1.0.0 - v2.1.0)
+  - 📉 `Nota de Crédito`
+  - 📈 `Nota de Débito`
+  - 🚛 `Guía de Remisión`
+  - 💰 `Comprobante de Retención`
+- **Seguridad**: Usa librerías criptográficas estándar de Go (`crypto/rsa`, `crypto/x509`) y `goxmldsig` para C14N confiable.
+- **Sin CGO**: Compilación fácil y estática para cualquier SO.
 
 ---
 
-## 📦 Installation
+## 📦 Instalación
 
 ```bash
 go get github.com/nelsonmarro/go_ec_sri_invoice_signer
@@ -30,9 +31,9 @@ go get github.com/nelsonmarro/go_ec_sri_invoice_signer
 
 ---
 
-## 🛠 Usage
+## 💻 Uso como Librería
 
-### Basic Example (Signing an Invoice)
+La librería expone funciones específicas para cada tipo de documento, facilitando la integración.
 
 ```go
 package main
@@ -40,92 +41,138 @@ package main
 import (
  "fmt"
  "os"
-
  "github.com/nelsonmarro/go_ec_sri_invoice_signer/pkg/signer"
 )
 
 func main() {
- // 1. Load your XML document (must be a valid SRI XML string)
- xmlContent := `<?xml version="1.0" encoding="UTF-8"?><factura id="comprobante">...</factura>`
+ // 1. Cargar el XML (previamente generado y validado con XSD)
+ xmlBytes, _ := os.ReadFile("factura_generada.xml")
+ xmlStr := string(xmlBytes)
 
- // 2. Load your signature file (.p12 or .pfx)
- p12Bytes, err := os.ReadFile("firma_electronica.p12")
+ // 2. Cargar el archivo de firma (.p12)
+ p12Bytes, _ := os.ReadFile("firma.p12")
+ password := "TuContraseña123"
+
+ // 3. Configurar opciones (SHA1 es el estándar actual del SRI)
+ opts := &signer.SignOptions{
+  Password:  password,
+  Algorithm: signer.SHA1,
+ }
+
+ // 4. Firmar según el tipo de documento
+ var signedXML string
+ var err error
+
+ // Ejemplo: Factura
+ signedXML, err = signer.SignInvoice(xmlStr, p12Bytes, opts)
+
+ // Otros métodos disponibles:
+ // signedXML, err = signer.SignCreditNote(xmlStr, p12Bytes, opts)
+ // signedXML, err = signer.SignDebitNote(xmlStr, p12Bytes, opts)
+ // signedXML, err = signer.SignDeliveryGuide(xmlStr, p12Bytes, opts)
+ // signedXML, err = signer.SignWithholdingCertificate(xmlStr, p12Bytes, opts)
+
  if err != nil {
   panic(err)
  }
 
- // 3. Sign the document
- signedXML, err := signer.SignInvoice(xmlContent, p12Bytes, &signer.SignOptions{
-  Password: "your_password",
- })
- if err != nil {
-  fmt.Printf("Error signing document: %v\n", err)
-  return
- }
-
- // 4. Use the signed XML (e.g., send to SRI web service)
  fmt.Println(signedXML)
 }
 ```
 
 ---
 
-## 🏗 Architectural Decisions
+## 🛠 Herramienta de Pruebas (SRI Tester CLI)
 
-This library was designed with specific constraints to ensure compatibility with SRI's legacy systems:
+La librería incluye una potente herramienta de línea de comandos (CLI) para realizar pruebas **End-to-End** contra el ambiente de pruebas del SRI. Esto es ideal para verificar que tu firma es válida antes de integrarla en tu aplicación.
 
-1. **PKCS#12 Library**: We use `software.sslmate.com/src/go-pkcs12` instead of the standard `x/crypto/pkcs12` to provide better support for various P12 encryption algorithms used by Ecuadorian certification authorities (like SecurityData, Banco Central, etc.).
-2. **Canonicalization (C14N)**: Uses `github.com/ucarion/c14n` to ensure that the XML signature remains valid even after transmission.
-3. **Id Generation**: Generates random unique IDs for each signature element (`Signature`, `SignedInfo`, `KeyInfo`, etc.) to prevent collisions in systems processing multiple documents.
-4. **Error Handling**: Provides descriptive custom errors (e.g., `ErrParsingP12`, `ErrMissingClosingTag`) to help developers quickly identify integration issues.
+### Instalación del CLI
 
----
-
-## 📂 Project Structure
-
-- `pkg/signer`: Public API. Use this to sign your documents.
-- `pkg/crypto`: Internal helpers for RSA-SHA1 signing and P12 parsing.
-- `pkg/c14n`: XML Canonicalization implementation.
-- `pkg/types`: Internal XAdES-BES XML struct definitions for marshaling.
-
----
-
-## ⚠️ Troubleshooting
-
-### Legacy P12 Files
-
-If you receive an error like `pkcs12: unknown digest algorithm`, it's often because the P12 was exported with modern algorithms not supported by older Go versions or specific environments.
-**Solution**: Re-export your P12 using the `-legacy` flag in OpenSSL:
+Puedes instalar la herramienta globalmente en tu sistema:
 
 ```bash
-openssl pkcs12 -export -out legacy_signature.p12 -inkey key.pem -in cert.pem -legacy
+
+go install github.com/nelsonmarro/go_ec_sri_invoice_signer/cmd/sri-tester@latest
+
 ```
 
+Asegúrate de que tu `$GOPATH/bin` esté en tu PATH.
+
+### Cómo usar el CLI
+
+Una vez instalado, ejecuta el comando `sri-tester`:
+
+```bash
+
+# 1. Obtener ayuda y ver opciones
+
+sri-tester --help
+
+```
+
+### Ejemplos de Prueba
+
+**1. Probar Factura (Default):**
+
+Genera una factura de prueba, la firma y la envía al SRI.
+
+```bash
+
+sri-tester sign-send \
+  -p12 ruta/a/tu/firma.p12 \
+  -pass tu_contraseña \
+  -ruc 1700000000001
+
+# puedes agregar el flag -type factura si quieres ser especifico
+
+```
+
+**2. Probar Nota de Crédito:**
+
+```bash
+
+sri-tester sign-send \
+  -p12 firma.p12 \
+  -pass 1234 -ruc 1700000000001 \
+  -type notaCredito
+
+```
+
+**3. Probar Comprobante de Retención:**
+
+```bash
+sri-tester sign-send \
+  -p12 firma.p12 \
+  -pass 1234 -ruc 1700000000001 \
+  -type comprobanteRetencion
+```
+
+### Interpretación de Resultados
+
+El CLI te mostrará el progreso en tiempo real:
+
+1. **Generación:** Crea un XML válido con Clave de Acceso aleatoria.
+2. **Firma:** Aplica la firma XAdES-BES.
+3. **Envío (Recepción):**
+   - `✅ SRI Status: RECIBIDA`: El SRI recibió el XML y pasó la validación inicial (firma y esquema).
+   - `❌ SRI Status: DEVUELTA`: Error en el XML o firma (el mensaje detallado se imprimirá).
+4. **Autorización (Consulta):** Espera 3 segundos y consulta el estado final.
+   - `🎉 Result: AUTORIZADO`: ¡Éxito total! Tu firma funciona.
+   - `⏳ Result: EN PROCESO`: El SRI está lento, pero el documento es válido.
+   - `❌ Result: NO AUTORIZADO`: El SRI rechazó el documento (ej: RUC clausurado, error lógico).
+
 ---
 
-## 🤝 Contributing
+## 🏗 Detalles Técnicos
 
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-1. Fork the Project
-2. Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the Branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
+1. **Canonicalización Inclusiva**: El SRI requiere estrictamente `REC-xml-c14n-20010315`. Usamos `goxmldsig` para garantizar el cumplimiento, ya que las librerías por defecto de Go suelen usar C14N Exclusivo (pensado para SAML).
+2. **Aislamiento de Namespaces**: Para evitar el error "Firma Inválida" (Error 39), los namespaces de XAdES (`etsi`) se declaran localmente en sus respectivos nodos (`QualifyingProperties`), evitando que ensucien el hash del nodo `SignedInfo` durante la canonicalización.
+3. **Hash Directo**: El documento base se hashea directamente tras una limpieza de espacios, asegurando que la transformación `enveloped-signature` del SRI produzca el mismo resultado binario.
 
 ---
 
-## 📄 License
+## 📄 Licencia
 
-Distributed under the MIT License. See `LICENSE` for more information.
+Distribuido bajo la Licencia MIT. Ver `LICENSE` para más detalles.
 
----
-
-## 🙌 Thanks
-
-Special thanks to [Bryan Calisto](https://github.com/bryancalisto) for the original TypeScript implementation which served as the foundation for this Go port.
-
----
-
-_Maintained by [nelsonmarro](https://github.com/nelsonmarro)_
-
+_Mantenido por [nelsonmarro](https://github.com/nelsonmarro)_

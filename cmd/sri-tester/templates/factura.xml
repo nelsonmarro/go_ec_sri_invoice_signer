@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<factura id="comprobante" version="1.1.0">
+    <infoTributaria>
+        <ambiente>{{ambiente}}</ambiente>
+        <tipoEmision>1</tipoEmision>
+        <razonSocial>{{razonSocial}}</razonSocial>
+        <nombreComercial>{{nombreComercial}}</nombreComercial>
+        <ruc>{{ruc}}</ruc>
+        <claveAcceso>{{claveAcceso}}</claveAcceso>
+        <codDoc>01</codDoc>
+        <estab>{{estab}}</estab>
+        <ptoEmi>{{ptoEmi}}</ptoEmi>
+        <secuencial>{{secuencial}}</secuencial>
+        <dirMatriz>{{dirMatriz}}</dirMatriz>
+    </infoTributaria>
+    <infoFactura>
+        <fechaEmision>{{fechaEmision}}</fechaEmision>
+        <dirEstablecimiento>{{dirEstablecimiento}}</dirEstablecimiento>
+        <obligadoContabilidad>SI</obligadoContabilidad>
+        <tipoIdentificacionComprador>05</tipoIdentificacionComprador>
+        <razonSocialComprador>CONSUMIDOR FINAL</razonSocialComprador>
+        <identificacionComprador>9999999999</identificacionComprador>
+        <totalSinImpuestos>10.00</totalSinImpuestos>
+        <totalDescuento>0.00</totalDescuento>
+        <totalConImpuestos>
+            <totalImpuesto>
+                <codigo>2</codigo>
+                <codigoPorcentaje>4</codigoPorcentaje>
+                <baseImponible>10.00</baseImponible>
+                <valor>1.50</valor>
+            </totalImpuesto>
+        </totalConImpuestos>
+        <propina>0.00</propina>
+        <importeTotal>11.50</importeTotal>
+        <moneda>DOLAR</moneda>
+        <pagos>
+            <pago>
+                <formaPago>01</formaPago>
+                <total>11.50</total>
+            </pago>
+        </pagos>
+    </infoFactura>
+    <detalles>
+        <detalle>
+            <codigoPrincipal>001</codigoPrincipal>
+            <descripcion>PRUEBA SRI</descripcion>
+            <cantidad>1.00</cantidad>
+            <precioUnitario>10.00</precioUnitario>
+            <descuento>0.00</descuento>
+            <precioTotalSinImpuesto>10.00</precioTotalSinImpuesto>
+            <impuestos>
+                <impuesto>
+                    <codigo>2</codigo>
+                    <codigoPorcentaje>4</codigoPorcentaje>
+                    <tarifa>15</tarifa>
+                    <baseImponible>10.00</baseImponible>
+                    <valor>1.50</valor>
+                </impuesto>
+            </impuestos>
+        </detalle>
+    </detalles>
+</factura>
