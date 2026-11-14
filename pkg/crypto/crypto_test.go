@@ -157,6 +157,120 @@ func TestParsePKCS12(t *testing.T) {
 	}
 }
 
+// newCert issues a certificate for pub, signed by parent/parentKey (self-signed when parent is nil).
+func newCert(t *testing.T, serial int64, cn string, pub *rsa.PublicKey, parent *x509.Certificate, parentKey *rsa.PrivateKey, isCA bool) *x509.Certificate {
+	t.Helper()
+	tpl := &x509.Certificate{
+		SerialNumber:          big.NewInt(serial),
+		Subject:               pkix.Name{CommonName: cn},
+		NotBefore:             time.Now().Add(-time.Hour),
+		NotAfter:              time.Now().Add(time.Hour),
+		IsCA:                  isCA,
+		BasicConstraintsValid: true,
+	}
+	if parent == nil {
+		parent = tpl
+	}
+	der, err := x509.CreateCertificate(rand.Reader, tpl, parent, pub, parentKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cert, err := x509.ParseCertificate(der)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return cert
+}
+
+// Ecuadorian CAs (Security Data, UANATACA, Banco Central) ship .p12 files that
+// carry the issuing chain next to the signer certificate.
+func TestParsePKCS12WithCertificateChain(t *testing.T) {
+	caKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatal(err)
+	}
+	signerKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatal(err)
+	}
+	root := newCert(t, 1, "Test Root CA", &caKey.PublicKey, nil, caKey, true)
+	sub := newCert(t, 2, "Test Sub CA", &caKey.PublicKey, root, caKey, true)
+	leaf := newCert(t, 3, "Test Signer", &signerKey.PublicKey, sub, caKey, false)
+
+	encoders := map[string]*pkcs12.Encoder{"legacy": pkcs12.Legacy, "modern": pkcs12.Modern}
+	for name, enc := range encoders {
+		t.Run(name+"/signer certificate first", func(t *testing.T) {
+			data, err := enc.Encode(signerKey, leaf, []*x509.Certificate{sub, root}, "pw")
+			if err != nil {
+				t.Fatal(err)
+			}
+			key, cert, err := ParsePKCS12(data, "pw")
+			if err != nil {
+				t.Fatalf("ParsePKCS12 failed on a .p12 with a chain: %v", err)
+			}
+			if !cert.Equal(leaf) || key.N.Cmp(signerKey.N) != 0 {
+				t.Errorf("got certificate %q, want the signer certificate", cert.Subject.CommonName)
+			}
+		})
+		t.Run(name+"/signer certificate not first", func(t *testing.T) {
+			// The file lists a CA certificate where the signer's is expected.
+			data, err := enc.Encode(signerKey, root, []*x509.Certificate{sub, leaf}, "pw")
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, cert, err := ParsePKCS12(data, "pw")
+			if err != nil {
+				t.Fatalf("ParsePKCS12 failed: %v", err)
+			}
+			if !cert.Equal(leaf) {
+				t.Errorf("got certificate %q, want the one matching the private key", cert.Subject.CommonName)
+			}
+		})
+	}
+
+	t.Run("no certificate matches the key", func(t *testing.T) {
+		data, err := pkcs12.Modern.Encode(signerKey, root, []*x509.Certificate{sub}, "pw")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, _, err := ParsePKCS12(data, "pw"); err == nil {
+			t.Error("want an error when no certificate belongs to the private key")
+		}
+	})
+}
+
+func TestGetIssuerNameIsRFC2253(t *testing.T) {
+	tests := []struct {
+		name   string
+		issuer pkix.Name
+		want   string
+	}{
+		{
+			name:   "plain",
+			issuer: pkix.Name{CommonName: "Test CA", Organization: []string{"Test Org"}, Country: []string{"EC"}},
+			want:   "CN=Test CA,O=Test Org,C=EC",
+		},
+		{
+			// A comma inside a value is escaped; the space after it belongs to the value.
+			name:   "comma and space inside a value",
+			issuer: pkix.Name{CommonName: "AC ACME", Organization: []string{"ACME, S.A."}, Country: []string{"EC"}},
+			want:   `CN=AC ACME,O=ACME\, S.A.,C=EC`,
+		},
+		{
+			name:   "real-world shape",
+			issuer: pkix.Name{CommonName: "AUTORIDAD DE CERTIFICACION SUBCA-2 SECURITY DATA", OrganizationalUnit: []string{"ENTIDAD DE CERTIFICACION DE INFORMACION"}, Organization: []string{"SECURITY DATA S.A. 2"}, Country: []string{"EC"}},
+			want:   "CN=AUTORIDAD DE CERTIFICACION SUBCA-2 SECURITY DATA,OU=ENTIDAD DE CERTIFICACION DE INFORMACION,O=SECURITY DATA S.A. 2,C=EC",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := GetIssuerName(&x509.Certificate{Issuer: tt.issuer}); got != tt.want {
+				t.Errorf("GetIssuerName() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
 // Helper for go versions < 1.18 where strings.Contains is available but I want to be explicit
 func contains(s, substr string) bool {
 	for i := 0; i < len(s)-len(substr)+1; i++ {
