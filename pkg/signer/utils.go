@@ -11,7 +11,6 @@ import (
 
 	"github.com/beevik/etree"
 	libcrypto "github.com/nelsonmarro/go_ec_sri_invoice_signer/pkg/crypto"
-	dsig "github.com/russellhaering/goxmldsig"
 )
 
 // Helper Functions & Builders
@@ -42,13 +41,21 @@ func parseRootElement(xmlBytes string) (*etree.Element, error) {
 	if err := doc.ReadFromBytes([]byte(xmlBytes)); err != nil {
 		return nil, fmt.Errorf("failed to parse XML document: %w", err)
 	}
-	return doc.Root(), nil
+	root := doc.Root()
+	if root == nil {
+		return nil, fmt.Errorf("failed to parse XML document: no root element")
+	}
+	return root, nil
 }
 
-func ensureRootID(root *etree.Element) {
-	if root.SelectAttr("id") == nil {
-		root.CreateAttr("id", "comprobante")
+// ensureRootID returns the value of the root's id attribute, adding the SRI
+// default ("comprobante") when the document has none.
+func ensureRootID(root *etree.Element) string {
+	if attr := root.SelectAttr("id"); attr != nil {
+		return attr.Value
 	}
+	root.CreateAttr("id", defaultRootID)
+	return defaultRootID
 }
 
 type xadesIDs struct {
@@ -80,7 +87,7 @@ func buildSignedProperties(id, docRefID string, cert *x509.Certificate, digestAl
 	spEl.CreateAttr("xmlns:ds", DsNamespace)
 
 	loc := time.FixedZone("UTC-5", -5*60*60)
-	signingTime := time.Now().In(loc).Format("2006-01-02T15:04:05-07:00")
+	signingTime := nowFunc().In(loc).Format("2006-01-02T15:04:05-07:00")
 
 	certHash := libcrypto.GetCertHash(cert)
 	issuerName := libcrypto.GetIssuerName(cert)
@@ -118,7 +125,7 @@ func buildKeyInfo(id string, key *rsa.PrivateKey, cert *x509.Certificate) *etree
 	return kiEl
 }
 
-func buildSignedInfo(id, sigAlgo, digestAlgo, docRefID, spRefID, kiRefID, docHash, spHash, kiHash string) *etree.Element {
+func buildSignedInfo(id, sigAlgo, digestAlgo, docRefID, rootID, spRefID, kiRefID, docHash, spHash, kiHash string) *etree.Element {
 	siEl := etree.NewElement("ds:SignedInfo")
 	siEl.CreateAttr("Id", id)
 	siEl.CreateAttr("xmlns:ds", DsNamespace)
@@ -141,10 +148,11 @@ func buildSignedInfo(id, sigAlgo, digestAlgo, docRefID, spRefID, kiRefID, docHas
 	// Ref 3: Document
 	refDoc := siEl.CreateElement("ds:Reference")
 	refDoc.CreateAttr("Id", docRefID)
-	refDoc.CreateAttr("URI", "#comprobante")
+	refDoc.CreateAttr("URI", "#"+rootID)
 	trans := refDoc.CreateElement("ds:Transforms")
 	trans.CreateElement("ds:Transform").CreateAttr("Algorithm", AlgorithmTransform)
-	// C14N removed here to match document hashing strategy
+	// No explicit C14N transform: the verifier canonicalizes with the default
+	// (inclusive C14N 1.0), which is the form the document digest is computed on.
 
 	refDoc.CreateElement("ds:DigestMethod").CreateAttr("Algorithm", digestAlgo)
 	refDoc.CreateElement("ds:DigestValue").SetText(docHash)
@@ -152,59 +160,38 @@ func buildSignedInfo(id, sigAlgo, digestAlgo, docRefID, spRefID, kiRefID, docHas
 	return siEl
 }
 
-func buildFinalSignature(sigID, sigValueID, objID string, siCanonical []byte, sigValueB64 string, kiCanonical, spCanonical []byte) *etree.Element {
-	signature := etree.NewElement("ds:Signature")
-	signature.CreateAttr("Id", sigID)
+// buildSignature assembles ds:Signature without SignedInfo and SignatureValue,
+// which depend on digests of the other parts. It also returns the
+// SignedProperties and KeyInfo elements so they can be digested in place.
+func buildSignature(ids xadesIDs, key *rsa.PrivateKey, cert *x509.Certificate, digestAlgo string) (signature, signedProps, keyInfo *etree.Element) {
+	signature = etree.NewElement("ds:Signature")
+	signature.CreateAttr("Id", ids.Signature)
 	signature.CreateAttr("xmlns:ds", DsNamespace)
-	// xmlns:etsi removed from root to keep SignedInfo clean
+	// xmlns:etsi is declared on QualifyingProperties, not here: declaring it on
+	// ds:Signature would put it in scope of SignedInfo and change its digest.
 
-	// SignedInfo
-	siDoc := etree.NewDocument()
-	_ = siDoc.ReadFromBytes(siCanonical)
-	signature.AddChild(siDoc.Root())
+	keyInfo = buildKeyInfo(ids.KeyInfo, key, cert)
+	signature.AddChild(keyInfo)
 
-	// SignatureValue
-	svEl := signature.CreateElement("ds:SignatureValue")
-	svEl.CreateAttr("Id", sigValueID)
-	svEl.SetText(sigValueB64)
-
-	// KeyInfo
-	kiDoc := etree.NewDocument()
-	_ = kiDoc.ReadFromBytes(kiCanonical)
-	signature.AddChild(kiDoc.Root())
-
-	// Object (XAdES)
 	obj := signature.CreateElement("ds:Object")
-	obj.CreateAttr("Id", objID)
+	obj.CreateAttr("Id", ids.Object)
 	qp := obj.CreateElement("etsi:QualifyingProperties")
 	qp.CreateAttr("xmlns:etsi", XadesNamespace)
-	qp.CreateAttr("Target", "#"+sigID)
+	qp.CreateAttr("Target", "#"+ids.Signature)
 
-	spDoc := etree.NewDocument()
-	_ = spDoc.ReadFromBytes(spCanonical)
-	qp.AddChild(spDoc.Root())
+	signedProps = buildSignedProperties(ids.SignedProps, ids.DocRef, cert, digestAlgo)
+	qp.AddChild(signedProps)
 
-	obj.AddChild(qp)
-
-	return signature
+	return signature, signedProps, keyInfo
 }
 
-func injectSignature(cleanXML, rootTagName string, signature *etree.Element, canon dsig.Canonicalizer) (string, error) {
-	sigBytes, _ := canon.Canonicalize(signature)
-	finalSignatureStr := string(sigBytes)
-
-	closingTag := fmt.Sprintf("</%s>", rootTagName)
-	idx := strings.LastIndex(cleanXML, closingTag)
-	if idx == -1 {
-		return "", fmt.Errorf("closing tag %s not found", closingTag)
+// Test seams: the golden tests pin the clock and the ID source.
+var (
+	nowFunc    = time.Now
+	selfVerify = Verify
+	randomID   = func() string {
+		b := make([]byte, 4)
+		rand.Read(b)
+		return fmt.Sprintf("%x", b)
 	}
-
-	header := `<?xml version="1.0" encoding="UTF-8" standalone="no"?>` + "\n"
-	return header + cleanXML[:idx] + finalSignatureStr + cleanXML[idx:], nil
-}
-
-func randomID() string {
-	b := make([]byte, 4)
-	rand.Read(b)
-	return fmt.Sprintf("%x", b)
-}
+)

@@ -52,7 +52,7 @@ func TestSignDocumentInternal(t *testing.T) {
 	}
 
 	xmlDoc := `<factura id="comprobante"><info>test content</info></factura>`
-	
+
 	// Test signing with SHA1 (default for SRI)
 	signedXML, err := signDocumentInternal(xmlDoc, key, cert, "factura", SHA1)
 	if err != nil {
@@ -69,7 +69,7 @@ func TestSignDocumentInternal(t *testing.T) {
 	if !strings.Contains(signedXML, "Algorithm=\"http://www.w3.org/2000/09/xmldsig#rsa-sha1\"") {
 		t.Error("Wrong signature algorithm for SHA1")
 	}
-	
+
 	// Verify XML Validity
 	var doc interface{}
 	if err := xml.Unmarshal([]byte(signedXML), &doc); err != nil {
@@ -103,7 +103,7 @@ func TestBuildSignedProperties(t *testing.T) {
 	if sp.FindElement("etsi:SignedSignatureProperties") == nil {
 		t.Error("Missing etsi:SignedSignatureProperties")
 	}
-	
+
 	// Verify CertDigest
 	certEl := sp.FindElement("./etsi:SignedSignatureProperties/etsi:SigningCertificate/etsi:Cert/etsi:CertDigest")
 	if certEl == nil {
@@ -128,7 +128,7 @@ func TestBuildKeyInfo(t *testing.T) {
 	}
 
 	ki := buildKeyInfo("ki-1", key, cert)
-	
+
 	// Verify X509Data
 	x509Data := ki.FindElement("ds:X509Data")
 	if x509Data == nil {
@@ -154,7 +154,7 @@ func TestBuildKeyInfo(t *testing.T) {
 }
 
 func TestBuildSignedInfo(t *testing.T) {
-	si := buildSignedInfo("si-1", AlgorithmSignatureSHA1, AlgorithmDigestSHA1, "ref-doc", "ref-sp", "ref-ki", "hashDoc", "hashSP", "hashKI")
+	si := buildSignedInfo("si-1", AlgorithmSignatureSHA1, AlgorithmDigestSHA1, "ref-doc", "comprobante", "ref-sp", "ref-ki", "hashDoc", "hashSP", "hashKI")
 
 	// Verify Algorithms
 	c14n := si.FindElement("ds:CanonicalizationMethod")
@@ -178,7 +178,7 @@ func TestBuildSignedInfo(t *testing.T) {
 	if docRef == nil {
 		t.Fatal("Document reference not found")
 	}
-	
+
 	transforms := docRef.FindElement("ds:Transforms")
 	if transforms == nil {
 		t.Error("Missing Transforms for document")
@@ -193,14 +193,18 @@ func TestBuildSignedInfo(t *testing.T) {
 	}
 }
 
-func TestBuildFinalSignature(t *testing.T) {
-	validXML := []byte("<root></root>")
-	sig := buildFinalSignature("sig-1", "val-1", "obj-1", validXML, "valB64", validXML, validXML)
+func TestBuildSignature(t *testing.T) {
+	key, cert, err := generateTestKeys()
+	if err != nil {
+		t.Fatal(err)
+	}
+	ids := xadesIDs{Signature: "sig-1", SigInfo: "si-1", SigValue: "val-1", KeyInfo: "ki-1", Object: "obj-1", SignedProps: "sp-1", DocRef: "ref-1"}
+	sig, sp, ki := buildSignature(ids, key, cert, AlgorithmDigestSHA1)
 
 	if sig.Tag != "Signature" { // "ds:Signature" when serialized
 		t.Error("Root tag should be Signature")
 	}
-	
+
 	// Check namespace placement (Critical for SRI)
 	// xmlns:etsi should NOT be in Signature root, but in Object
 	if sig.SelectAttr("xmlns:etsi") != nil {
@@ -211,13 +215,23 @@ func TestBuildFinalSignature(t *testing.T) {
 	if obj == nil {
 		t.Fatal("Missing Object")
 	}
-	
+
 	qp := obj.FindElement("etsi:QualifyingProperties")
 	if qp == nil {
 		t.Fatal("Missing QualifyingProperties")
 	}
-	
+
 	if qp.SelectAttrValue("xmlns:etsi", "") != XadesNamespace {
 		t.Error("QualifyingProperties missing xmlns:etsi definition")
+	}
+	if qp.SelectAttrValue("Target", "") != "#sig-1" {
+		t.Error("QualifyingProperties must target the signature")
+	}
+
+	if sp.Parent() != qp || sp.SelectAttrValue("Id", "") != "sp-1" {
+		t.Error("SignedProperties must be returned attached to QualifyingProperties")
+	}
+	if ki.Parent() != sig || ki.SelectAttrValue("Id", "") != "ki-1" {
+		t.Error("KeyInfo must be returned attached to the signature")
 	}
 }

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<factura id="comprobante" version="1.1.0">
+    <infoTributaria>
+        <ambiente>1</ambiente>
+        <tipoEmision>1</tipoEmision>
+        <razonSocial>COMERCIAL ÑANDÚ &amp; HIJOS S.A.</razonSocial>
+        <ruc>1790000000001</ruc>
+        <claveAcceso>1411202601179000000000110010010000000011234567811</claveAcceso>
+        <codDoc>01</codDoc>
+        <estab>001</estab>
+        <ptoEmi>001</ptoEmi>
+        <secuencial>000000001</secuencial>
+        <dirMatriz>Av. Amazonas N34-12 y Atahualpa</dirMatriz>
+    </infoTributaria>
+    <infoFactura>
+        <fechaEmision>14/11/2026</fechaEmision>
+        <totalSinImpuestos>100.00</totalSinImpuestos>
+        <importeTotal>115.00</importeTotal>
+    </infoFactura>
+</factura>

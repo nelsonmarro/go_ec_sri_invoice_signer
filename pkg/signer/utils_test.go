@@ -2,11 +2,9 @@ package signer
 
 import (
 	"crypto"
-	"strings"
 	"testing"
 
 	"github.com/beevik/etree"
-	dsig "github.com/russellhaering/goxmldsig"
 )
 
 func TestCleanXMLString(t *testing.T) {
@@ -123,31 +121,5 @@ func TestRandomID(t *testing.T) {
 	}
 	if len(id1) == 0 {
 		t.Error("randomID should not be empty")
-	}
-}
-
-func TestInjectSignature(t *testing.T) {
-	cleanXML := `<factura id="comprobante"><info>test</info></factura>`
-	canon := dsig.MakeC14N10RecCanonicalizer()
-	sig := etree.NewElement("ds:Signature")
-	sig.CreateAttr("Id", "sig123")
-
-	signed, err := injectSignature(cleanXML, "factura", sig, canon)
-	if err != nil {
-		t.Fatalf("injectSignature failed: %v", err)
-	}
-
-	if !strings.Contains(signed, "<?xml") {
-		t.Error("result should have XML header")
-	}
-	if !strings.Contains(signed, "standalone=\"no\"") {
-		t.Error("result should have standalone=no")
-	}
-	if !strings.Contains(signed, "<ds:Signature Id=\"sig123\"") {
-		t.Error("signature not injected correctly")
-	}
-	// Check position: inside root, likely at end
-	if !strings.HasSuffix(strings.TrimSpace(signed), "</factura>") {
-		t.Error("signature should be inside root element")
 	}
 }

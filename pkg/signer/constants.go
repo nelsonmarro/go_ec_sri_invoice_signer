@@ -3,7 +3,10 @@ package signer
 const (
 	DsNamespace    = "http://www.w3.org/2000/09/xmldsig#"
 	XadesNamespace = "http://uri.etsi.org/01903/v1.3.2#"
-	
+
+	defaultRootID = "comprobante"
+	xmlHeader     = `<?xml version="1.0" encoding="UTF-8" standalone="no"?>` + "\n"
+
 	// Algorithms
 	AlgorithmC14N            = "http://www.w3.org/TR/2001/REC-xml-c14n-20010315"
 	AlgorithmDigestSHA1      = "http://www.w3.org/2000/09/xmldsig#sha1"

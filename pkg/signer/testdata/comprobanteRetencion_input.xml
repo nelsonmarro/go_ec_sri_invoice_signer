@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<comprobanteRetencion id="comprobante" version="2.0.0">
+    <infoTributaria>
+        <ambiente>1</ambiente>
+        <razonSocial>COMERCIAL PRUEBA S.A.</razonSocial>
+        <ruc>1790000000001</ruc>
+        <codDoc>07</codDoc>
+    </infoTributaria>
+    <infoCompRetencion>
+        <fechaEmision>14/11/2026</fechaEmision>
+        <periodoFiscal>11/2026</periodoFiscal>
+    </infoCompRetencion>
+</comprobanteRetencion>
