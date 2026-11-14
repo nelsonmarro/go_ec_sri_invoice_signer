@@ -22,7 +22,7 @@ func xmlsec1Verify(t *testing.T, signedXML, rootTag string) {
 	out, err := exec.Command(bin, "--verify",
 		"--id-attr:id", rootTag,
 		"--id-attr:Id", XadesNamespace+":SignedProperties",
-		"--trusted-pem", "testdata/test_cert.pem",
+		"--trusted-pem", writeTestCertPEM(t),
 		"--enabled-key-data", "x509,rsa",
 		path).CombinedOutput()
 	if err != nil {

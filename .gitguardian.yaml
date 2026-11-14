@@ -1,7 +1,0 @@
-version: 2
-
-secret:
-  # Throwaway RSA key generated for the golden tests. Its self-signed certificate
-  # (CN "TEST ONLY - NOT A REAL SIGNER") is trusted by nothing.
-  ignored_paths:
-    - "pkg/signer/testdata/test_key.pem"
