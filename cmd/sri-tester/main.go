@@ -82,28 +82,9 @@ func main() {
 func runSignSend(p12Path, pass, docType, ruc string, verbose bool) {
 	fmt.Printf("⚙️  Config: Type=%s, RUC=%s, Verbose=%v\n", docType, ruc, verbose)
 
-	// 1. Load Template from EMBEDDED filesystem
-	templatePath := fmt.Sprintf("templates/%s.xml", docType)
-	tmplBytes, err := templateFS.ReadFile(templatePath)
-	if err != nil {
-		panic(fmt.Sprintf("Error al cargar el template embebido %s: %v", templatePath, err))
-	}
-	xmlStr := string(tmplBytes)
-
-	// 2. Determinar Código SRI
-	var sriCode string
-	switch docType {
-	case "factura":
-		sriCode = "01"
-	case "notaCredito":
-		sriCode = "04"
-	case "notaDebito":
-		sriCode = "05"
-	case "guiaRemision":
-		sriCode = "06"
-	case "comprobanteRetencion":
-		sriCode = "07"
-	default:
+	// 1-2. Código SRI del tipo de documento
+	sriCode, ok := sriDocCodes[docType]
+	if !ok {
 		panic("Tipo de documento desconocido para la generación del código SRI")
 	}
 
@@ -111,18 +92,11 @@ func runSignSend(p12Path, pass, docType, ruc string, verbose bool) {
 	accessKey := generateAccessKey(ruc, sriCode)
 	fmt.Printf("🔑 Clave de Acceso Generada: %s (Tipo: %s)\n", accessKey, docType)
 
-	// 4. Reemplazar Placeholders
-	xmlStr = strings.ReplaceAll(xmlStr, "{{claveAcceso}}", accessKey)
-	xmlStr = strings.ReplaceAll(xmlStr, "{{ruc}}", ruc)
-	xmlStr = strings.ReplaceAll(xmlStr, "{{ambiente}}", "1") // Pruebas
-	xmlStr = strings.ReplaceAll(xmlStr, "{{razonSocial}}", "PRUEBAS SRI")
-	xmlStr = strings.ReplaceAll(xmlStr, "{{nombreComercial}}", "PRUEBAS")
-	xmlStr = strings.ReplaceAll(xmlStr, "{{estab}}", "001")
-	xmlStr = strings.ReplaceAll(xmlStr, "{{ptoEmi}}", "001")
-	xmlStr = strings.ReplaceAll(xmlStr, "{{secuencial}}", accessKey[30:39])
-	xmlStr = strings.ReplaceAll(xmlStr, "{{dirMatriz}}", "Quito")
-	xmlStr = strings.ReplaceAll(xmlStr, "{{dirEstablecimiento}}", "Quito")
-	xmlStr = strings.ReplaceAll(xmlStr, "{{fechaEmision}}", time.Now().Format("02/01/2006"))
+	// 4. Cargar el template embebido y reemplazar placeholders
+	xmlStr, err := renderTemplate(docType, ruc, accessKey, time.Now())
+	if err != nil {
+		panic(err.Error())
+	}
 
 	// 5. Firmar
 	fmt.Println("✍️  Firmando XML...")
@@ -170,6 +144,42 @@ func runSignSend(p12Path, pass, docType, ruc string, verbose bool) {
 }
 
 // --- Helpers ---
+
+// sriDocCodes maps each supported document type (its root element and
+// template name) to the SRI document code.
+var sriDocCodes = map[string]string{
+	"factura":              "01",
+	"notaCredito":          "04",
+	"notaDebito":           "05",
+	"guiaRemision":         "06",
+	"comprobanteRetencion": "07",
+}
+
+// renderTemplate loads the embedded template of docType and fills in its placeholders.
+func renderTemplate(docType, ruc, accessKey string, now time.Time) (string, error) {
+	if _, ok := sriDocCodes[docType]; !ok {
+		return "", fmt.Errorf("tipo de documento desconocido: %s", docType)
+	}
+	templatePath := fmt.Sprintf("templates/%s.xml", docType)
+	tmplBytes, err := templateFS.ReadFile(templatePath)
+	if err != nil {
+		return "", fmt.Errorf("error al cargar el template embebido %s: %w", templatePath, err)
+	}
+	return strings.NewReplacer(
+		"{{claveAcceso}}", accessKey,
+		"{{ruc}}", ruc,
+		"{{ambiente}}", "1", // Pruebas
+		"{{razonSocial}}", "PRUEBAS SRI",
+		"{{nombreComercial}}", "PRUEBAS",
+		"{{estab}}", "001",
+		"{{ptoEmi}}", "001",
+		"{{secuencial}}", accessKey[30:39],
+		"{{dirMatriz}}", "Quito",
+		"{{dirEstablecimiento}}", "Quito",
+		"{{fechaEmision}}", now.Format("02/01/2006"),
+		"{{periodoFiscal}}", now.Format("01/2006"),
+	).Replace(string(tmplBytes)), nil
+}
 
 func generateAccessKey(ruc, tipo string) string {
 	date := time.Now().Format("02012006")

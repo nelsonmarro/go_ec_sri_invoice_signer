@@ -18,6 +18,7 @@
 - `SignPurchaseSettlement` para liquidaciones de compra.
 - `ErrCertificateExpired` y `ErrCertificateNotYetValid`: el certificado se valida contra la fecha actual antes de firmar.
 - Se comprueba que la etiqueta raíz del XML sea la del tipo de comprobante que se pidió firmar.
+- `sri-tester`: la plantilla de comprobante de retención pasa al formato ATS **versión 2.0.0** (retenciones dentro de `docsSustento`, obligatorio por la Res. NAC-DGERCGC22-00000024) con los porcentajes vigentes desde marzo de 2026 (bienes 2 %, IVA 30 %). Valida contra el XSD oficial `ComprobanteRetencion_V2.0.0.xsd`.
 - CI con GitHub Actions (formato, `go vet`, tests con `-race`, `govulncheck`) y tests de interoperabilidad con `xmlsec1`.
 
 ### Cambios de comportamiento a tener en cuenta
