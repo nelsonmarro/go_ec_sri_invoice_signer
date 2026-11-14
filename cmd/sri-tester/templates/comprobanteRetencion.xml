@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<comprobanteRetencion id="comprobante" version="1.0.0">
+<comprobanteRetencion id="comprobante" version="2.0.0">
     <infoTributaria>
         <ambiente>{{ambiente}}</ambiente>
         <tipoEmision>1</tipoEmision>
@@ -18,20 +18,51 @@
         <dirEstablecimiento>{{dirEstablecimiento}}</dirEstablecimiento>
         <obligadoContabilidad>SI</obligadoContabilidad>
         <tipoIdentificacionSujetoRetenido>05</tipoIdentificacionSujetoRetenido>
+        <parteRel>NO</parteRel>
         <razonSocialSujetoRetenido>PROVEEDOR PRUEBA</razonSocialSujetoRetenido>
         <identificacionSujetoRetenido>9999999999</identificacionSujetoRetenido>
-        <periodoFiscal>01/2026</periodoFiscal>
+        <periodoFiscal>{{periodoFiscal}}</periodoFiscal>
     </infoCompRetencion>
-    <impuestos>
-        <impuesto>
-            <codigo>1</codigo>
-            <codigoRetencion>312</codigoRetencion>
-            <baseImponible>100.00</baseImponible>
-            <porcentajeRetener>1.75</porcentajeRetener>
-            <valorRetenido>1.75</valorRetenido>
+    <docsSustento>
+        <docSustento>
+            <codSustento>01</codSustento>
             <codDocSustento>01</codDocSustento>
             <numDocSustento>001001000000001</numDocSustento>
-            <fechaEmisionDocSustento>01/01/2026</fechaEmisionDocSustento>
-        </impuesto>
-    </impuestos>
+            <fechaEmisionDocSustento>{{fechaEmision}}</fechaEmisionDocSustento>
+            <pagoLocExt>01</pagoLocExt>
+            <totalSinImpuestos>100.00</totalSinImpuestos>
+            <importeTotal>115.00</importeTotal>
+            <impuestosDocSustento>
+                <impuestoDocSustento>
+                    <codImpuestoDocSustento>2</codImpuestoDocSustento>
+                    <codigoPorcentaje>4</codigoPorcentaje>
+                    <baseImponible>100.00</baseImponible>
+                    <tarifa>15</tarifa>
+                    <valorImpuesto>15.00</valorImpuesto>
+                </impuestoDocSustento>
+            </impuestosDocSustento>
+            <retenciones>
+                <retencion>
+                    <codigo>1</codigo>
+                    <codigoRetencion>312</codigoRetencion>
+                    <baseImponible>100.00</baseImponible>
+                    <porcentajeRetener>2</porcentajeRetener>
+                    <valorRetenido>2.00</valorRetenido>
+                </retencion>
+                <retencion>
+                    <codigo>2</codigo>
+                    <codigoRetencion>1</codigoRetencion>
+                    <baseImponible>15.00</baseImponible>
+                    <porcentajeRetener>30</porcentajeRetener>
+                    <valorRetenido>4.50</valorRetenido>
+                </retencion>
+            </retenciones>
+            <pagos>
+                <pago>
+                    <formaPago>20</formaPago>
+                    <total>115.00</total>
+                </pago>
+            </pagos>
+        </docSustento>
+    </docsSustento>
 </comprobanteRetencion>
