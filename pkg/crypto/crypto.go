@@ -9,13 +9,17 @@ import (
 	"encoding/base64"
 	"fmt"
 	"math/big"
-	"strings"
 
 	"software.sslmate.com/src/go-pkcs12"
 )
 
+// ParsePKCS12 extracts the signing key and its certificate from a .p12/.pfx file.
+//
+// Files issued by Ecuadorian CAs usually carry the issuing chain as well, and
+// not always with the signer's certificate first, so the certificate returned
+// is the one whose public key matches the private key.
 func ParsePKCS12(data []byte, password string) (*rsa.PrivateKey, *x509.Certificate, error) {
-	pv, cert, err := pkcs12.Decode(data, password)
+	pv, first, others, err := pkcs12.DecodeChain(data, password)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to decode pkcs12: %w", err)
 	}
@@ -23,7 +27,12 @@ func ParsePKCS12(data []byte, password string) (*rsa.PrivateKey, *x509.Certifica
 	if !ok {
 		return nil, nil, fmt.Errorf("private key is not an RSA key")
 	}
-	return rsaKey, cert, nil
+	for _, cert := range append([]*x509.Certificate{first}, others...) {
+		if pub, ok := cert.PublicKey.(*rsa.PublicKey); ok && pub.Equal(&rsaKey.PublicKey) {
+			return rsaKey, cert, nil
+		}
+	}
+	return nil, nil, fmt.Errorf("no certificate in the pkcs12 file matches its private key")
 }
 
 func SHA1(data []byte) string {
@@ -45,11 +54,11 @@ func GetPrivateKeyData(key *rsa.PrivateKey) (string, string) {
 	return modulus, exponent
 }
 
+// GetIssuerName returns the issuer distinguished name in RFC 2253 form (most
+// specific RDN first, comma-separated without spaces, special characters
+// escaped), which is what xades:X509IssuerName carries.
 func GetIssuerName(cert *x509.Certificate) string {
-	// El SRI espera el formato RFC 2253 (CN primero).
-	// cert.Issuer.String() de Go suele devolverlo correctamente pero con espacios.
-	// Eliminamos los espacios tras las comas para cumplir con la literalidad del SRI.
-	return strings.ReplaceAll(cert.Issuer.String(), ", ", ",")
+	return cert.Issuer.String()
 }
 
 func GetCertHash(cert *x509.Certificate) string {
